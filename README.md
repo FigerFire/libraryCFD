@@ -16,8 +16,5 @@ library/
 ├── books/
 │   ├── fundamentals/        # 基础教材
 │   └── advanced/            # 进阶教材与专题文集
-├── notes/                   # 项目笔记、分析文档与 TeX 源文件
-├── cases/                   # 可运行算例及其参考资料
-├── models/                  # 物性和模型参考资料
-└── tools/                   # 翻译等辅助脚本
+└──notes/                   # 项目笔记、分析文档与 TeX 源文件
 ```
