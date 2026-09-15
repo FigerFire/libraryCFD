@@ -1,0 +1,999 @@
+% !TEX program = xelatex
+\documentclass[11pt,a4paper]{article}
+
+% 中文支持
+\usepackage[UTF8]{ctex}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage{geometry}
+\usepackage{enumitem}
+\usepackage{mathrsfs}
+\usepackage{bm}
+\usepackage{booktabs}
+\usepackage{caption}
+\usepackage{fancyhdr}
+
+\geometry{margin=2.5cm}
+
+% 标题信息
+\title{\heiti 曲率依赖速度下传播的前沿：\\
+基于 Hamilton-Jacobi 方程的算法}
+\author{
+    Stanley Osher \\
+    {\small 加州大学洛杉矶分校数学系} \\
+    \and
+    James A. Sethian \\
+    {\small 加州大学伯克利分校数学系}
+}
+\date{1987年9月 \\ {\small NASA 合同报告 178382，ICASE 报告号 87-66}}
+
+\begin{document}
+
+\maketitle
+
+\begin{center}
+\rule{0.6\textwidth}{0.4pt}
+\small
+NASA 合同报告 178382 \quad ICASE 报告号 87-66 \\[4pt]
+\textbf{曲率依赖速度下传播的前沿：基于 Hamilton-Jacobi 方程的算法} \\[4pt]
+Stanley Osher, James A. Sethian \\[4pt]
+NASA 合同号 NAS1-18107，1987年9月 \\[4pt]
+计算机科学在科学与工程中的应用研究所（ICASE）\\
+NASA 兰利研究中心，弗吉尼亚州汉普顿 23665
+\rule{0.6\textwidth}{0.4pt}
+\end{center}
+
+\vspace{1cm}
+
+% ============================================================
+\section*{摘要}
+% ============================================================
+
+我们设计了一类新的数值算法，称为 PSC（Propagation of Surfaces under Curvature，曲率下曲面传播）算法，
+用于追踪以曲率依赖速度传播的前沿。该速度可以是曲率的任意函数，前沿也可以被背景流场被动平流输运。
+这些算法通过利用双曲守恒律的技术，近似求解运动方程——这些方程类似于带有抛物型右侧项的 Hamilton-Jacobi 方程。
+采用各种精度阶数的无振荡格式来求解方程，从而能够精确捕捉移动前沿中尖锐梯度和角点的形成。
+该算法自然地处理拓扑合并与分裂，适用于任意空间维数，且不要求将移动曲面写为函数形式。
+这些方法也可用于更一般的 Hamilton-Jacobi 型问题。
+我们通过计算各种曲面运动问题的解来演示我们的算法。
+
+\medskip
+\noindent\textbf{关键词：}前沿，曲率，Hamilton-Jacobi，火焰，PSC 算法
+
+\newpage
+
+% ============================================================
+\section{引言}
+\label{sec:intro}
+% ============================================================
+
+在多种物理现象中，人们希望追踪以局部曲率依赖速度运动的前沿的轨迹。
+两个众所周知的例子是晶体生长 \cite{chorin1985, langer1980, langer1983, mullins1963, mullins1965, nichols1965, pamphlin1975, turnbull1956} 
+和火焰传播 \cite{frankel1982, landau1944, markstein1951, markstein1964, sethian1984, sivashinsky1977, zeldovich1981}。
+在本文中，我们引入、分析并运用一类新的数值算法来研究此类问题。
+这些新算法近似求解传播前沿的运动方程，这些方程类似于带有黏性项的 Hamilton-Jacobi 方程。
+我们通过计算各种曲面运动问题的解来演示我们的算法。
+
+这一方法背后的理论基础和数值实验已在一系列论文中得到发展，参见 \cite{sethian1982, sethian1985, sethian1987a, sethian1987b}。
+在本文中，这些思想与双曲守恒律数值逼近技术相结合，产生了我们称之为 PSC 格式（曲率下曲面传播格式）的算法。
+这些新格式允许在 $N$ 维空间中追踪 $N-1$ 维曲面的运动。
+速度可以是曲率的任意函数，前沿也可以被背景流场被动平流输运。
+这些算法可以构造为具有任意所需的空间和时间精度，且不要求前沿保持为函数形式。
+该方法属于欧拉框架，因此计算单元的数量在初始时就已固定。
+拓扑合并与分裂被自然地处理，基本的一阶格式极其简单，易于编程。
+
+作为这类算法广泛适用性的说明，考虑火焰传播的情况，参见 \cite{sethian1987b}。
+一个常见的模型将燃烧的火焰理想化为一个无限薄的边界，它将恒定稳态速度、密度和温度的区域分隔开来，
+并以依赖于局部曲率的速度向未燃流体中传播。
+其思想是：伸入未燃气体的冷凸指状结构，其传播速度比凹区域慢——凹区域是包围少量未燃气体袋的热气体区域。
+同时，沿火焰前沿的粒子在燃烧时经历体积膨胀，在火焰前沿产生速度跳跃。
+速度场中的这种不连续性在燃烧火焰沿线产生涡量，该涡量可与局部曲率相关联，
+而这个新的涡量场又贡献于传播火焰的平流输运。
+因此，移动火焰的速度至少以两种不同的方式依赖于局部曲率。
+
+\medskip
+\textbf{已有方法的局限。}
+通常，在此类问题的求解中采用两类数值算法。
+第一类通过某个变量对移动前沿进行参数化，并将该参数化离散为一组标记点。
+标记点的位置根据运动方程的近似值随时间更新。
+这类技术在追踪小扰动的运动时可以达到极高的精度。
+然而，对于大尺度、复杂的运动，很快就会出现几个问题。
+首先，在传播前沿曲率增大的区域，标记粒子会聚集在一起，除非采用重新布点技术，否则将导致数值不稳定。
+重新布点机制通常包含一个类似于扩散的误差项，该误差项会主导正在分析的曲率真实效应。
+其次，这类方法遭遇拓扑问题：当两个区域"燃烧"在一起形成一个单一区域时，
+需要特别的技巧来消除部分边界，才能使算法正常工作。
+
+另一类常用算法属于"流体体积"（volume of fluid）技术的范畴，
+这类方法不追踪传播前沿的边界，而是追踪内部区域的运动。
+这类算法的一个例子是 SLIC \cite{noh1976}。
+在这些算法中，内部区域被离散化，通常通过在域上使用网格并为每个单元分配一个"体积分数"——对应当前位于该单元内的内部流体数量。
+这类技术的优点是，随着计算的进行，不需要新增计算单元（不像参数化方法），
+并且复杂的拓扑边界容易处理，参见 \cite{chorin1980, sethian1982}。
+不幸的是，从这种边界表示难以计算前沿的曲率。
+
+\medskip
+\textbf{本文的核心思想}是建立以曲率依赖速度传播的前沿的正确运动方程。
+该方程是一个带有依赖曲率效应的右侧项的 Hamilton-Jacobi 初值方程。
+当曲率效应趋于零时，右侧项的极限是一个带有相应熵条件的程函方程（eikonal equation）。
+通过将曲面视为一个水平集（level set），移动前沿中的拓扑复杂性和变化被自然地处理。
+以这些方程为基础，可以利用为双曲守恒律求解而发展的技术，设计任意精度阶数的数值算法。
+特别地，可以设计出具有正确极限熵满足解的算法。
+事实上，一些先前的算法可以被视为对我们的运动方程的较不精细的近似。
+
+\medskip
+\textbf{该方法的演变历史。}
+这一方法的演变颇为有趣。受 SLIC \cite{noh1976} 在惠更斯原理火焰传播格式 \cite{chorin1980} 中应用的启发，
+文献 \cite{sethian1982} 为移动前沿制定了熵条件。
+在 \cite{sethian1982} 中，随后证明了惠更斯方法是程函方程的近似——程函方程是右侧为零的常系数 Hamilton-Jacobi 方程，
+并且所假设的熵条件在该方程中自然出现。
+从程函框架来看，标记粒子的固有数值不稳定性被揭示并得到了证明，参见 \cite{sethian1982, sethian1987b}。
+然后，我们研究了曲率对传播前沿的影响，并在 \cite{sethian1985, sethian1987a, sethian1986} 中证明了
+曲率为 Hamilton-Jacobi 运动方程添加了一个抛物型右侧项。
+\cite{sethian1985} 中的数值证据表明，\cite{sethian1982} 中制定的熵条件在曲率效应消失时选出了正确的黏性极限。
+使用 Lax-Friedrichs 格式近似求解这些方程的解是令人满意的，然而，中心差分的
+使用产生了虚假的边界条件。这自然引向了本文所采用的高维公式化和高阶迎风格式的引入。
+
+\medskip
+\textbf{本文结构。}
+第 II 节给出适合数值离散的传播曲线和曲面的运动方程。
+然后我们描述一些过去的工作，给出一些先前结果的新证明，并呈现一些新工作。
+第 III 节给出将要使用的双曲守恒格式数值方法的背景，并展示如何用它们来提供 Hamilton-Jacobi 方程的解。
+第 IV 和 V 节使用这些技术来近似求解各种涉及传播曲线和曲面的问题。
+附录 A 讨论任何标记粒子离散化（不重新布点时）必然遇到的固有困难（线性不适定性）。
+附录 B 构造用于一般 Hamilton-Jacobi 方程高阶精度逼近的本质无振荡插值函数。
+
+% ============================================================
+\section{初步分析}
+\label{sec:analysis}
+% ============================================================
+
+我们给出以曲率依赖速度运动的曲线和曲面的运动方程以及一些理论结果。
+我们遵循 \cite{sethian1985} 中的分析，从一个简单的、光滑的、闭合的初始曲线 $\gamma(0) \subset \mathbb{R}^2$ 开始。
+设 $\gamma(t)$ 为曲线的单参数族，其中 $t \in [0,\infty)$ 为时间，
+通过沿法向量场以速度 $F$ 移动初始曲线生成，$F$ 是曲率 $\kappa$ 的函数。
+设 $\mathbf{X}(s,t) = (x(s,t), y(s,t))$ 为用参数 $s$ 参数化 $\gamma(t)$ 的位置向量，$0 \leq s \leq S$，
+$\mathbf{X}(0,t) = \mathbf{X}(S,t)$。曲线参数化使得内部位于 $s$ 增大方向的左侧。
+以 $\kappa(s,t)$ 为 $\mathbf{X}(s,t)$ 处的曲率，运动方程可写为
+\begin{equation}
+\frac{\partial \mathbf{X}}{\partial t} = F(\kappa)\,\mathbf{n},
+\label{eq:2.1}
+\end{equation}
+其中 $\mathbf{n}$ 为单位外法向量，待求解的 $t$ 区间为 $[0,\infty)$，初始条件 $\mathbf{X}(s,0)$，$s \in [0,S]$ 给定。
+这里曲率定义为其标准形式。
+
+\textbf{命题 2.1} \quad 只要曲线 $\gamma$ 保持光滑且不自交，则 $f$ 满足偏微分方程
+\begin{equation}
+F^2\left(f_x^2 + f_y^2\right) = 1.
+\label{eq:2.2}
+\end{equation}
+
+\textbf{证明：} 由式 (\ref{eq:2.1}) 定义的映射的 Jacobi 行列式为
+\begin{equation}
+J = \begin{vmatrix} x_s & y_s \\ x_t & y_t \end{vmatrix}
+= F(\kappa)(x_s^2 + y_s^2)^{1/2},
+\end{equation}
+其中 $\kappa$ 为 Cartesian 坐标下的曲率。只要该映射保持光滑且一一对应，我们就有
+$f_x^2 + f_y^2 = t_x^2 + t_y^2 = y_s^2/J^2 + x_s^2/J^2 = 1/F^2$，即完成证明。\hfill $\square$
+
+我们注意到，式 (\ref{eq:2.2}) 通常是一个二阶非线性偏微分方程，需要在 $(x,y,f)$ 空间中
+在 $(x_0(s), y_0(s), 0)$ 附近求解，然而我们仅在初始曲线上给定初值
+$f(x_0(s), y_0(s)) = \text{常数}$，并无 $f$ 在该曲线上法向导数的信息。
+这个看似矛盾的情况由以下命题解决：
+
+\textbf{命题 2.2} \quad 给定常数 $t_0$，设 $\gamma_0$ 为 $f$ 的水平曲线，即 $t_0 = f(x_0(s), y_0(s))$。
+则 $\gamma_0(s)$ 是式 (\ref{eq:2.2}) 的特征曲线。
+
+\textbf{证明：} 沿 $\gamma$ 对 $s$ 微分 $f$ 得 $f_x x_s + f_y y_s = 0$。
+再次对 $s$ 微分，并利用前一关系，可得所需结论。\hfill $\square$
+
+按照 \cite{sethian1985}，我们定义度量 $g(s,t) = (x_s^2 + y_s^2)^{1/2}$ 和角度 $\theta = \tan^{-1}(y_s/x_s)$。
+简单计算给出 $\theta_s = g\kappa$。对式 (\ref{eq:2.1}) 关于 $s$ 微分并重写所得系统，得到
+\begin{align}
+g_t &= -\theta_s F'(\kappa), \label{eq:2.3} \\
+\theta_t &= \frac{1}{g}\bigl[g_s F(\kappa) + g\theta_s F'(\kappa)\bigr]. \label{eq:2.4}
+\end{align}
+
+定义前沿在时刻 $t$ 的变分为
+\begin{equation}
+\text{Var}(t) \equiv \int_{0}^{S} |\kappa(s,t)|\,g(s,t)\,ds = \int_{0}^{S} |\theta_s|\,ds.
+\end{equation}
+
+利用此公式，我们推广 \cite{sethian1982} 中首次出现的一个结果。
+
+\textbf{命题 2.3} \quad 考虑一条以速度 $F(\kappa)$ 按式 (\ref{eq:2.1}) 运动的曲线。
+假设 $F'(0) \leq 0$ 且 $\theta$ 在 $0 \leq t \leq T$ 上保持在 $BV[[0,S]\times[0,T]]$ 类中。
+则 $\frac{d}{dt}\text{Var}(t) \leq 0$。
+
+\textbf{证明：} 光滑函数的证明思路可追溯至 Oleinik \cite{oleinik1956}，
+并由 Kruz'kov \cite{kruzkov1970} 推广到当前的函数类。\hfill $\square$
+
+\textbf{激波类比。} 
+令 $F = 1 - \varepsilon\kappa$，我们得到
+\begin{equation}
+\kappa_t = \varepsilon\kappa_{ss} - \varepsilon\kappa^3 - \kappa^2.
+\label{eq:2.5}
+\end{equation}
+对于 $\varepsilon=0$，
+\begin{equation}
+\kappa(s,t) = \frac{\kappa(s,0)}{1 + t\,\kappa(s,0)}.
+\end{equation}
+如果 $\kappa(s,0)$ 在任何地方为负，上式将在有限时间内变为无穷大，
+这类似于单个标量凸守恒律中激波的形成。更精确地，考虑带有凹函数 $G$ 的"黏性"守恒律
+\begin{equation}
+u_t + [G(u)]_x = \varepsilon u_{xx}.
+\label{eq:2.6}
+\end{equation}
+若取 $\varepsilon = 0$（激波情形），
+\begin{equation}
+u_t + [G(u)]_x = 0,\qquad u(x,0) = u_0(x)
+\label{eq:2.7}
+\end{equation}
+的弱解不唯一，需要一个附加的熵条件来选出正确的黏性极限。
+为确保式 (\ref{eq:2.7}) 的解是式 (\ref{eq:2.6}) 当 $\varepsilon \to 0$ 时的唯一极限，
+需施加任意等价类熵条件中的一个 \cite{lax1957, kruzkov1970, oleinik1956}。
+对我们的目的而言，相关的熵条件是几何的，即特征线沿时间增加的方向流入激波。
+
+对于移动曲线问题式 (\ref{eq:2.1})（等价于式 (\ref{eq:2.2})），当 $F=1$ 时，
+我们需要一个熵条件，在 $\varepsilon \to 0$ 时给出问题 $F = 1 - \varepsilon\kappa$ 的唯一极限解。
+将曲线 $\gamma$ 想象为将内部已燃区域与外部未燃区域分开的火焰，
+定义一个指示函数 $\phi(x,y,t) = 1$ 若 $(x,y)$ 处的粒子在时刻 $t$ 已燃，否则为零。
+在 \cite{sethian1982} 中，Sethian 提出了以下熵条件：
+若 $\phi(x,y,t^*) = 1$，则对所有 $t > t^*$ 有 $\phi(x,y,t) = 1$，
+即一旦粒子被燃烧，它保持已燃状态。
+这被证明等价于要求燃烧曲线流入角点。
+\cite{sethian1985} 中的数值证据表明，由该熵条件生成的弱解确实是正确的极限解。
+我们在此给出证明。
+
+\textbf{水平集方程。}
+设 $\phi(x,y,t)$ 是一个 Lipschitz 连续函数，使得在 $t=0$ 时，
+$\phi(x,y,0) > 1$ 在已燃区域 $\Omega$ 内（即由 $\gamma(0)$ 限定的区域），
+$\phi(x,y,0) < 1$ 在 $\Omega$ 外，$\phi(x,y,0) = 1$ 在 $\partial\Omega$ 上。
+接下来，定义 $\phi(x,y,t) = C$，其中 $t = f(x,y)$ 由式 (\ref{eq:2.2}) 对任意固定常数 $C$ 定义。
+由此得出
+\begin{equation}
+f_x = \frac{\phi_x}{-\phi_t},\qquad f_y = \frac{\phi_y}{-\phi_t},
+\end{equation}
+从而 $F^2(\phi_x^2 + \phi_y^2) = \phi_t^2$。
+因此，选择向外传播的方向，我们有
+\begin{equation}
+\phi_t - F(\kappa)|\nabla\phi| = 0.
+\label{eq:2.11}
+\end{equation}
+
+这也是一个带有二阶右侧项的 Hamilton-Jacobi 方程。
+然而，这种不同的公式化允许我们计算解，即使前沿不是函数形式，即使两个"已燃"区域合并在一起。
+
+使用此公式化和 Hamilton-Jacobi 方程黏性解的近期理论，
+Barles \cite{barles1985} 证明了 \cite{sethian1982} 中的熵条件选出了唯一的黏性解，
+即使在前沿不是函数形式时也成立。
+他将 $\phi(x,y,0)$ 定义为与初始曲面的带符号距离函数，并按式 (\ref{eq:2.11}) 
+在 $F=1$ 的特例中演化 $\phi$。他选取了由 Crandall-Lions \cite{crandall1984} 熵条件刻画的唯一黏性解，
+并证明了所得曲面 $\gamma(t) = \partial\Omega_t$（其中 $\partial\Omega_t = \{(x,y) \mid \phi(x,y,t) = 1\}$）
+按照 \cite{sethian1982} 中的熵条件演化。
+
+\textbf{向初始曲面的推广。}
+我们的结果容易推广到初始曲面的情况。
+假设曲面 $\Upsilon(0) = (x(s_1,s_2), y(s_1,s_2), z(s_1,s_2))$ 沿其法向量场以速度 $F(\kappa)$ 运动，
+产生 $\Upsilon(s_1,s_2,t) = \Upsilon(t)$。其可重写为 $t = f(x,y,z)$，其中 $F^2(f_x^2 + f_y^2 + f_z^2) = 1$。
+这里 $F = F(\kappa)$，若使用 Gauss 曲率则为一种形式，若使用平均曲率则为另一种形式。
+
+按照之前对传播曲线的讨论，我们可以聚焦初始曲面的一个小截面，产生如下形式的演化方程
+\begin{equation}
+Y_t - F(\kappa)(1 + Y_x^2 + Y_y^2)^{1/2} = 0,
+\label{eq:2.12}
+\end{equation}
+其中 $z = Y(x,y,t)$，$\kappa$ 为所选曲率形式。
+同时，我们可以再次将初始曲面视为函数 $\phi(x,y,z,t) = C$ 的一个水平集。
+更一般地，要移动一个 $n$ 维曲面 $f(x_1, \ldots, x_n) = t$，我们导出如下 Hamilton-Jacobi 型问题
+\begin{equation}
+\phi_t - F(\kappa)|\nabla\phi| = 0
+\label{eq:2.13}
+\end{equation}
+附以初始数据
+\begin{equation}
+\phi(\mathbf{x},0) = (1 - d(\mathbf{x},\Omega))_+ + d(\mathbf{x},\Omega^c),
+\end{equation}
+其中 $\phi(x_1, \ldots, x_n, t) = 1$，曲率被适当选取。
+当然，我们的数值格式在必要时选出正确的熵条件是至关重要的。
+
+% ============================================================
+\section{数值方法}
+\label{sec:numerical}
+% ============================================================
+
+我们已经看到，追踪以曲率依赖速度运动的前沿的问题变成了一个带有二阶右侧项的 Hamilton-Jacobi 方程。
+给定一个在 $\mathbb{R}^N$ 中传播的 $(N-1)$ 维曲面，我们有两种公式化：
+
+\begin{enumerate}[label=\arabic*)]
+    \item 式 (\ref{eq:2.12})：这是对 $Y$ 在 $N = n-1$ 个空间变量上的 Hamilton-Jacobi 型方程，适用于当前沿可写为函数形式时；
+    \item 式 (\ref{eq:2.13})：这是对 $\phi$ 在 $N = n$ 个空间变量上的 Hamilton-Jacobi 型方程，适用于无论前沿是否可以写为函数形式。
+\end{enumerate}
+
+因此，PSC 算法（曲率下曲面传播算法）依赖于如下形式方程的近似
+\begin{equation}
+\psi_t + H(\nabla\psi) = 0,\qquad \psi(\mathbf{x},0) = \psi_0(\mathbf{x}),
+\label{eq:3.1}
+\end{equation}
+其中 $\nabla\psi = (\psi_{x_1}, \ldots, \psi_{x_N})$。
+为简单起见，我们以 $F(\kappa) = 1$ 的情况表述方程。
+在公式化 1) 中，
+\begin{equation}
+H(u_1, \ldots, u_N) = -(1 + u_1^2 + \cdots + u_N^2)^{1/2},
+\label{eq:3.2}
+\end{equation}
+而在公式化 2) 中，
+\begin{equation}
+H(u_1, \ldots, u_N) = -(u_1^2 + \cdots + u_N^2)^{1/2}.
+\label{eq:3.3}
+\end{equation}
+
+虽然公式化 2) 更为一般，但公式化 1) 需要少一个维度，因而从数值计算的角度来看耗时较少。
+在本节中，我们描述可用于近似求解式 (\ref{eq:3.1}) 的数值方法。
+首先描述一维一阶单调方法，然后是更高阶方法。
+接着给出多维一阶单调方法的算法，随后是更高阶格式。
+然后展示如何将这些格式用于求解带有一般速度函数 $F(\kappa)$ 的情况。
+接着讨论初始化和边界条件，最后将算法扩展到传播加被动平流的情况。
+
+\subsection{一维空间}
+
+\subsubsection{一维一阶格式}
+
+在一维空间中，单个守恒律的技术几乎可以直接套用。
+我们对式 (\ref{eq:3.1}) 关于单个空间变量 $x$ 微分，并令 $u = \psi_x$，得到
+\begin{equation}
+u_t + [H(u)]_x = 0.
+\label{eq:3.4}
+\end{equation}
+
+如果近似求解上述方程的算法可以写成守恒形式
+\begin{equation}
+u_j^{n+1} = u_j^n - \lambda\Bigl[g(u_j^n, u_{j+1}^n) - g(u_{j-1}^n, u_j^n)\Bigr],
+\label{eq:3.5}
+\end{equation}
+其中 $\lambda = \Delta t/\Delta x$，且需要 $g(u,\ldots,u) = H(u)$，则称其为守恒形式格式。
+
+如果一个格式的右端是其所有参数的非递减函数，则称其为\textbf{单调格式}。
+可以证明，守恒型单调格式在间断附近无虚假过冲或振荡 \cite{kutnetsov1977}，
+并且极限解遵守熵条件。
+
+\textbf{Godunov 方法。}
+我们从典型的迎风单调格式开始，即 Godunov 方法 \cite{godunov1959}。
+该格式的一个关键方面是，通量函数 $g$ 是所有两点单调通量中黏性最小的 \cite{osher1984}。
+
+\textbf{HJ 格式。}
+我们提出一种新的迎风单调格式（HJ 格式），针对特例
+\begin{equation}
+H(u) = f(u^2),
+\end{equation}
+其中 $f'(u) < 0$。定义
+\begin{equation}
+g_{HJ}(u_j^n, u_{j+1}^n) = f\Bigl(\bigl(\min(u_j^n, 0)\bigr)^2 + \bigl(\max(u_{j+1}^n, 0)\bigr)^2\Bigr).
+\label{eq:3.7}
+\end{equation}
+
+该格式的优势在于它容易推广到多个空间维数（见下文）。
+
+\textbf{Hamilton-Jacobi 变量形式。}
+将上述任意格式写为 Hamilton-Jacobi 变量 $\psi$ 的形式是简单的。
+数值通量 $g$ 近似 $H$。在激波公式化中，$g$ 必须被微分（式 3.4, 3.5）。
+然而，$H$（以及其数值近似 $g$）直接出现在 Hamilton-Jacobi 公式化（式 3.1）中。
+因此我们可以立即写出
+\begin{equation}
+\psi_j^{n+1} = \psi_j^n - \Delta t\,g(D^-\psi_j^n, D^+\psi_j^n),
+\label{eq:3.8}
+\end{equation}
+其中 $g$ 为上述任意数值通量。在 Hamilton-Jacobi 语境中，很自然地将 $g$ 称为\textbf{数值 Hamiltonian}，我们此后也将如此称呼。
+CFL 条件为 $(\Delta t/\Delta x)|H'| \leq 1/2$。
+
+\subsubsection{一维高阶格式}
+
+虽然单调格式具有守恒形式、无虚假振荡和熵极限等期望性质，
+不幸的是它们仅限于一阶精度，且会抹平大多数间断。
+然而，它们确实启发了其他类保留这些性质的更高精度格式。
+
+一类新的高阶精度算法在 \cite{harten1987, harten1986} 中为守恒律设计。
+它们依赖于\textbf{本质无振荡插值函数}（ENO: Essentially Non-Oscillatory），
+可构造到任意高阶精度。事实上，在 Hamilton-Jacobi 框架下审视它们会导致大幅简化；
+因此我们直接进入此设定。
+
+\textbf{ENO 构造。}
+设 $\psi_j^n$ 近似时刻 $n\Delta t$ 的精确解。我们希望设计一个函数 $R^M(x; \Psi^n)$，
+在 $\psi$ 的光滑区域以 $O(\Delta x)^{M+1}$ 的精度逼近 $\psi(x, t_n)$。
+此外，即使 $\psi_x$ 不连续，该逼近函数也应是无振荡的，即不引入新的显著振荡。
+我们从基础向上构建插值函数：
+\begin{itemize}
+    \item $M=1$：$R^1(x; \Psi^n)$ 是连接点 $(x_j, \psi_j^n)$ 的唯一分段线性函数，恰好产生 Godunov 一阶算法。
+    \item $M=2$：在每个单元 $x_j \leq x \leq x_{j+1}$ 中，$R^2(x; \Psi^n)$ 是经过 $(x_j, \psi_j^n)$、$(x_{j+1}, \psi_{j+1}^n)$ 以及
+          $(x_{j-1}, \psi_{j-1}^n)$（左侧）或 $(x_{j+2}, \psi_{j+2}^n)$（右侧）中产生较小二阶导数（绝对值）的那个点的抛物线。
+          我们存储此选择并归纳重复以获得更高精度。
+\end{itemize}
+一般的 $M$ 阶构造见附录 B。
+
+\textbf{半离散格式。}
+我们通过将高阶时间导数以空间导数形式替换，或从半离散形式出发构造无振荡 Runge-Kutta 型算法 \cite{shu1987}：
+\begin{equation}
+\frac{d\psi_j}{dt} = -g(D^-\psi_j, D^+\psi_j).
+\end{equation}
+
+值得注意的是，对于一阶单调近似，Hamilton-Jacobi 和守恒律公式化产生相同的格式。
+然而，对于高阶方法则出现差异。
+
+\subsection{多维空间}
+
+一般地，多维 Hamilton-Jacobi 方程不能被重新表达为一个简单的守恒律系统。
+然而，我们现在为多维空间中任意 $H$ 设计一类新的单调迎风格式。
+在我们此处的应用中，即 $H(\psi_{x_1}, \ldots, \psi_{x_N}) = f(\psi_{x_1}^2, \ldots, \psi_{x_N}^2)$ 的情形，
+其中 $f$ 对其每个参数非递增，我们设计了一类特别简单的算法。
+
+\subsubsection{多维一阶格式}
+
+Crandall 和 Lions \cite{crandall1984} 分析了 Hamilton-Jacobi 方程的单调（因而一阶）差分近似。
+他们证明了最大范数下 $O(\Delta t)^{1/2}$ 的收敛率结果。
+然而，他们的唯一例子是 Lax-Friedrichs——依赖中心差分公式，遭受过度扩散之苦。
+不幸的是，在我们求解前沿传播问题时，计算域必须限制在有限区域内，因此需要远场边界条件。
+中心差分格式在边界处产生虚假的波，因为它没有利用传播特征线的方向。
+
+我们通过定义 Godunov 格式 \cite{godunov1959, osher1984} 的新迎风一阶推广来开始：
+\begin{equation}
+g_{GD} = H\bigl(D_x^-\psi_{jk}, D_x^+\psi_{jk};\, D_y^-\psi_{jk}, D_y^+\psi_{jk}\bigr).
+\label{eq:3.9}
+\end{equation}
+
+在我们特例 $H(u,v) = f(u^2, v^2)$ 中（其中 $f$ 对两个变量都非递增），
+我们的一维 HJ 格式容易推广到二维：
+\begin{equation}
+g_{HJ} = f\Bigl(
+    (\min(D_x^-\psi_{jk}, 0))^2 + (\max(D_x^+\psi_{jk}, 0))^2,\;
+    (\min(D_y^-\psi_{jk}, 0))^2 + (\max(D_y^+\psi_{jk}, 0))^2
+\Bigr).
+\label{eq:3.11}
+\end{equation}
+该格式是完全迎风的且单调的，CFL 约束为 $\frac{2\Delta t}{\Delta x}|H_1| + \frac{2\Delta t}{\Delta y}|H_2| \leq 1$。
+
+\subsubsection{多维高阶格式}
+
+我们通过逐维使用一维 ENO 重构过程将高阶方法推广到高维。
+例如，空间二阶方法为
+\begin{equation}
+\frac{d\psi_{jk}}{dt} = -\Bigl[
+    D_x^-\psi_{jk} + \bar{m}[D_x^- D_x^+\psi_{jk}, D_x^+ D_x^-\psi_{jk}] \;
+    D_y^-\psi_{jk} + \bar{m}[D_y^- D_y^+\psi_{jk}, D_y^+ D_y^-\psi_{jk}]
+\Bigr],
+\label{eq:3.12}
+\end{equation}
+其中 $\bar{m}[x, y] = x$ 若 $|x| \leq |y|$，否则 $\bar{m}[x, y] = y$，且若 $xy < 0$ 则取零。
+
+为获得时间上适当精度的全离散算法，我们将式 (\ref{eq:3.12}) 视为非线性演化算子
+\begin{equation}
+\frac{d\psi_{jk}}{dt} = \mathscr{L}[\psi_{jk}],
+\end{equation}
+并采用特定的 Runge-Kutta 型格式 \cite{shu1987}。
+
+\subsection{一般 $F(\kappa)$}
+
+对于一般 $F(\kappa)$，我们有
+\begin{equation}
+\psi_t + F(\kappa)H(\nabla\psi) = 0,
+\label{eq:3.13}
+\end{equation}
+其中 $\kappa$ 是曲率，涉及诸如 $\psi_{xx}$、$\psi_{yy}$、$\psi_{xy}$ 等项。
+我们发现有必要将 $F(\kappa)$ 分离为常数项（对流部分）和依赖 $\kappa$ 的项，即
+\begin{equation}
+F(\kappa) = F_0 + F_1(\kappa),
+\end{equation}
+其中 $F_0$ 为常数（可能为零），$F_1(0) = 0$。式 (\ref{eq:3.13}) 变为
+\begin{equation}
+\psi_t + F_0 H(\nabla\psi) = -F_1(\kappa) H(\nabla\psi).
+\label{eq:3.14}
+\end{equation}
+
+左侧的对流项 $H(\nabla\psi)$ 使用我们的无振荡迎风方法近似，
+而右侧的所有导数（包括 $\nabla\psi$）使用中心差分近似。
+这样做的原因可以很容易地从以下说明中看出：考虑初始半径为 1 的圆形前沿以速度 $F(\kappa) = \kappa$ 运动。
+在公式化 2（式 3.1, 3.3）中，这是无穷多个同心水平曲线之一：
+靠近中心的小半径曲线具有大曲率。
+由于右侧项 $\kappa H(\nabla\psi)$ 依赖于与 $(\psi_x^2 + \psi_y^2)^{1/2}$ 的乘除运算，
+而该量在原点附近非常接近零，因此在 $\kappa$ 和 $H(\nabla\psi)$ 内部对 $\psi_x$ 和 $\psi_y$ 的近似必须相同，
+否则将产生大的误差。因此，在整个右侧项中坚持使用中心差分是最简单的。
+也可以证明此半离散近似的线性稳定性。
+
+\subsection{初始化与奇异性}
+
+对于传播水平曲面，我们取
+\begin{equation}
+\psi(\mathbf{x}, 0) = 1 \pm d^2,
+\end{equation}
+其中 $d$ 是点 $\mathbf{x}$ 到初始曲面的距离，正（负）号表示 $\mathbf{x}$ 在初始曲面内（外）。
+
+会存在 $\nabla\psi$ 为零的点。在式 (\ref{eq:3.14}) 的右侧，曲率评估时分母中出现除以零
+（注意，这在函数表示公式化 1 中不会发生）。
+给定上述初始化函数，一阶近似下这些点被球形水平曲面包围，
+我们可以正式地计算当同心水平球面半径趋于零时的极限 $F_1(\kappa)\nabla\psi$。
+如果网格点恰好落在 $\psi$ 的临界点上，该极限直接代入格式的该点处。
+
+\subsection{远场边界条件}
+
+在传播函数的情况下（公式化 1），如果在 $x_1$ 和 $x_2$ 处 $\psi_x(x,0) = 0$，
+则我们可以在两端采用对称边界条件。
+
+然而，在水平曲面情况下（公式化 2），式 (\ref{eq:3.1}) 必须为所有 $\mathbb{R}^N$ 初始化和求解。
+因此计算域必须截断。
+当式 (\ref{eq:3.14}) 中存在非零对流项 $F_0$ 时，特征线将在远离感兴趣区域的地方向外行进，
+我们的迎风格式完美地适用于这些问题。
+在一阶格式中，对流项不需要远场数值边界条件，因为格式"看向正确的方向"。
+高阶格式涉及方向选择以消除虚假振荡。
+
+然而，式 (\ref{eq:3.14}) 右侧的曲率项必须加以一定注意。
+如果对流项相对较大，该近似中的不稳定性将被扫出域外。
+然而，如果 $F_0=0$，边界将发挥作用。
+如果边界远离初始曲面，我们可以想象穿过每个边界点的水平曲面几乎是一个球面。
+因此，我们使用塌缩球面的精确解作为 $\psi_t$ 右侧项的远场边界条件。
+
+\subsection{被动平流的加入}
+
+假设传播前沿也被背景速度场 $\mathbf{V} = (u_1, \ldots, u_N)$ 被动平流输运。
+可以证明，式 (\ref{eq:3.13}) 变为
+\begin{equation}
+\psi_t + F(\kappa)H(\nabla\psi) + \mathbf{V} \cdot \nabla\psi = 0.
+\label{eq:3.15}
+\end{equation}
+这里，当然 $\mathbf{V}$ 可能依赖于 $\mathbf{x}$ 和 $t$。
+对于下一节的数值结果，我们对每个对流项使用一阶迎风差分：
+$u_i^- D_i^-\psi + u_i^+ D_i^+\psi$。
+然而，当 $\mathbf{V}$ 依赖于 $\psi$ 时，前沿以非局部方式自行移动，此时需要更精细的方法。
+我们将在其他地方 \cite{sethian1988} 报告将算法扩展到这一重要问题的结果。
+
+% ============================================================
+\section{移动曲线}
+\label{sec:curves}
+% ============================================================
+
+在本节中，我们展示 PSC 算法应用于平面上各种涉及移动曲线的测试问题的多功能性。
+我们使用应用于传播函数和水平曲线的一阶和二阶 Hamilton-Jacobi 格式。
+在所有这些例子中，唯一的输入参数是初始曲线、时间步长 $\Delta t$、空间步长 $h = 1/N_{pt}$、
+格式阶数和速度函数 $F(\kappa)$。其余一切由 Hamilton-Jacobi 公式化自动处理。
+
+\subsection{$F(\kappa) = 1 - \varepsilon\kappa$，传播函数，对 $\varepsilon$ 的依赖性}
+
+首先，我们展示曲率项对传播前沿奇异性形成的影响。
+考虑初始曲线 $\psi(x,0) = \cos 8\pi x$，$0 \leq x \leq 1$。
+利用此初始数据，我们用二阶 Hamilton-Jacobi 格式计算初值问题（式 3.1, 3.2）的解，
+$F(\kappa) = 1 - \varepsilon\kappa$，其中 $\kappa = -\psi_{xx}/(1+\psi_x^2)$。
+
+在 $\varepsilon = 0.0$（图 1a）的情况下，移动前沿中形成角点，这些"激波"向上传播。
+在 $\varepsilon = 0.025$（图 1b）的情况下，由于曲率项，前沿保持光滑。
+在 $\varepsilon = 0.1$（图 1c）的情况下，扩散如此之大，以至于峰值首先开始向下移动
+（$1 - \varepsilon\kappa < 0$），然后才变得足够平坦以向上传播。
+
+\subsection{误差分析}
+
+我们验证 Hamilton-Jacobi 格式是否确实是二阶精度的。
+取初始数据 $\psi(x,0) = \cos 2\pi x$，$0 \leq x \leq 1$，$F(\kappa) = 1 - \varepsilon\kappa$，$\varepsilon = 0.01$。
+
+假设精确解可写为 $\psi(x,t) = \psi_h(x,t) + C h^R + O(h^{R+1})$，我们通过下式估计方法的阶数 $R$：
+\begin{equation}
+R \approx \log_2\frac{\|\psi_h - \psi_{h/2}\|}{\|\psi_{h/2} - \psi_{h/4}\|}.
+\end{equation}
+
+在表 1 中，一阶格式的 $R$ 值趋近于 1，二阶格式的 $R$ 值趋近于 2。
+
+\subsection{$F(\kappa) = \kappa$，传播函数}
+
+我们考虑周期曲线 $\psi(x,0) = \sin 2\pi x$ 作为初始数据，$F(\kappa) = \kappa$，
+用二阶格式求解式 (3.1-3.2)。这对应于一条在自身曲率下运动的曲线。
+该问题已在 \cite{gage1983, gage1984, gage1986, grayson1987} 中得到广泛研究，
+并简化为一个相对简单的抛物型方程。
+在图 2 中，我们展示了前沿在不同时刻的位置，表明周期前沿随时间松弛为一条直线。
+
+\subsection{水平曲线：燃尽，角点发展}
+
+我们取七角星形作为初始曲线，$F(\kappa) = 1$，采用第 IIID 节给出的初始化。
+计算域是以原点为中心、边长为 $1/2$ 的正方形，每边 300 个网格点，时间步长 $\Delta t = 0.0005$。
+在图 3 中，光滑的初始曲线发展出尖锐的角点，然后随着前沿燃烧而展开，渐近地趋近于圆形。
+
+\subsection{水平曲线：曲率下的运动}
+
+以相同的七角星形初始曲线，令 $F(\kappa) = \kappa$，对应前沿以等于其曲率的速度向内移动。
+最近已证明 \cite{grayson1987} 任何非自交曲线在此运动下必定光滑地塌缩为圆形。
+在图 4a--4d 中，我们展示从 $t=0.0$ 到 $t=0.2$ 曲面的继续演化。
+图像显示了波峰和波谷的松弛以及平滑为圆形的过程。
+
+在图 5a--5d 中，我们展示了相同运动应用于不同初始曲线——缠绕螺旋线的结果。
+该螺旋线展开、塌缩为圆形并最终在 $t=0.295$ 消失（当对所有 $i,j$ 都有 $\psi_{ij} < 1$ 时曲面消失）。
+
+\subsection{水平曲线：$F(\kappa) = 1 - \varepsilon\kappa$，合并与断裂}
+
+使用上述缠绕螺旋线初始曲线，图 6 展示了 $F(\kappa) = 1 - \varepsilon\kappa$，$N_{pt} = 200$，$\Delta t = 0.0001$ 的结果。
+在图 6b 中，螺旋线膨胀并由于强对流分量而断裂，分离成两条曲线，
+一条向外传播，一条向内收缩。在图 6c 中，外部前沿继续膨胀，内部前沿塌缩消失。
+在图 6d 中，只剩下外部前沿，渐近趋近于圆形。
+
+\subsection{水平曲线：被动平流与传播}
+
+最后，我们求解被动平流加传播方程（式 3.15），
+采用例 D 中的七角星形初始曲线，$F(\kappa) = 1$，
+以及速度场 $\mathbf{V} = (-y, x)/(\sqrt{x^2 + y^2})$。
+这对应绕原点逆时针的刚体旋转。
+在图 7 中，我们展示了星形在不同时刻的膨胀和旋转。
+
+% ============================================================
+\section{移动曲面}
+\label{sec:surfaces}
+% ============================================================
+
+在本节中，我们使用 PSC 算法计算三维空间中若干二维曲面的演化。
+
+\subsection{传播函数曲面，$F(\kappa) = 1$}
+
+我们演化初始曲面
+\begin{equation}
+\psi(x,y,0) = -0.25[\cos(2\pi x) - 1][\cos(2\pi y) - 1] + 1,
+\end{equation}
+按照式 (3.1), (3.2)，$F(\kappa) = 1$，$\Delta t = 0.01$，$N_{pt} = 50$（每个方向），周期边界条件。
+该曲面在中心单位正方形边界上平坦，在 $(0,0)$ 处有全局最小值。
+在图 8a 中，曲面以单位速度向上移动，渐近趋近于平面。
+
+添加曲率效应，令 $F(\kappa) = 1 - \varepsilon\kappa$，$\varepsilon = 0.1$。
+在图 8b 中，凹陷由于曲率效应而被大幅平滑，曲面更快地变平。
+
+\textbf{鞍形曲面。} 
+考虑
+\begin{equation}
+\psi(x,y,0) = \cos(2\pi x) - \cos(2\pi y).
+\end{equation}
+在图 9a 中，上升曲面在 $y$ 坐标方向的鞍点处发展出不连续性。
+添加曲率（图 9b，$F(\kappa) = 1 - \varepsilon\kappa$，$\varepsilon = 0.1$）后，激波被平滑。
+最后，我们让鞍形曲面纯粹在其自身曲率下运动（$F(\kappa) = \kappa$，$\kappa$ 为平均曲率），
+图 10 展示其向稳态平面的快速运动。
+
+\subsection{水平曲面：球面，$F(\kappa) = 1$}
+
+我们演化由半径为 $0.5$ 的球面描述的初始曲面。
+计算域为长方体 $[-1,1] \times [-1,1] \times [-1,1]$，$F(\kappa) = 1$，$\Delta t = 0.01$，$N_{pt} = 50$。
+该问题的解只是一个半径 $r$ 以恒定速率 $dr/dt = 1$ 增大的球面。
+在图 11a--11b 中，球面平滑地膨胀。特别令人感兴趣的是图 11b 中的三个曲面：
+当球面膨胀时，其部分边界与计算域的边界相交，这体现在水平曲面 $\psi = 1$ 被盒子侧面截断。
+这展示了迎风格式的一个优势：由于信息流入边界，曲面不知边界的存在，水平曲面的内部点不受影响。
+
+\subsection{水平曲面：环面，$F(\kappa) = 1 - \varepsilon\kappa$}
+
+我们演化满足
+\begin{equation}
+z^2 = R_0^2 - \bigl(\sqrt{x^2 + y^2} - R_1\bigr)^2
+\end{equation}
+的环形初始曲面，其中 $R_0 = 0.5$，$R_1 = 0.05$（主半径 $0.5$，小半径 $0.05$）。
+计算域为 $[-1,1] \times [-1,1] \times [-0.8, 0.8]$，$F(\kappa) = 1 - \varepsilon\kappa$，$\varepsilon = 0.001$，$\Delta t = 0.01$，
+$x$ 和 $y$ 每边 $N_{pt} = 90$ 个点。
+
+在图 12a--12b 中，我们展示曲面在不同时刻的形态。
+首先，环面平滑地（且可逆地）燃烧，直到主半径塌缩到零。
+此时（$T=0.3$），亏格从 1 变为 0，特征线碰撞，熵条件被自动调用。
+曲面随后看起来像一个在顶部和底部具有深向内尖刺的球面。
+这些尖刺随着曲面的移动而展开，曲面趋近于渐近球状。
+
+\subsection{水平曲面：球面和环面，$F(\kappa) = \kappa$（平均曲率）}
+
+最后，我们展示两个曲面在其平均曲率下的流动。该问题已被广泛研究，参见 \cite{brakke1978, grayson1987b}。
+
+首先，我们演化初始半径为 $1.0$ 的球面，以速度 $F(\kappa) = \kappa$ 运动。
+由对称性论证，演化曲面应为一个半径递减、最终消失的球面。
+在图 13a--13b 中，半径起初缓慢减小，在接近终点时非常迅速地减小。
+显示的最终形状（$T=6.6$）是在给定网格尺寸下能够分辨的最小曲面。
+
+最后，我们演化一个环形初始曲面在平均曲率下的运动。内半径为 $0.25$，外半径为 $0.5$。
+在图 14a--14b 中，环面平滑地放气并塌缩为显示的环形，随后消失。
+
+% ============================================================
+\section*{总结}
+% ============================================================
+
+我们提出了一类称为 PSC 格式的算法，用于曲面在自身曲率下的运动。
+这些算法依赖于使用双曲守恒律的逼近技术数值求解带有黏性项的 Hamilton-Jacobi 方程。
+为展示我们的技术，我们计算了各种曲面运动问题的解。
+我们希望该工具可以应用于多个领域，如火焰拉伸、涡面卷起、Hele-Shaw 槽流动和晶体生长。
+
+\medskip
+\noindent 计算机程序副本可从第二作者处获取。所有计算在加州大学伯克利分校和劳伦斯伯克利实验室完成。
+
+\medskip
+\noindent\textbf{致谢：} 感谢 G.~Barles、A.~Chorin、O.~Hald、M.~Grayson 和 P.L.~Lions。
+此外，感谢 Bill Johnston 和劳伦斯伯克利实验室图形组帮助制作图像。
+
+\newpage
+
+% ============================================================
+\appendix
+\section{标记粒子的不稳定性}
+\label{app:A}
+% ============================================================
+
+在此，我们详细分析任何 Hamilton-Jacobi 方程的标记粒子离散化中固有的困难，
+并将其与以恒定速度运动的前沿的运动联系起来。
+
+考虑一般 Hamilton-Jacobi 方程
+\begin{equation}
+\psi_t = H(\psi_x),
+\label{eq:A.1}
+\end{equation}
+具有光滑初始数据 $(\tilde{x}_0(s), \tilde{\psi}_0(s))$。
+特征线法告诉我们，沿由下式定义的 $(x, \psi)$ 空间中的曲线，$\psi_x$ 是常数：
+\begin{equation}
+\frac{dx}{dt} = -H'(\psi_x),\qquad \frac{d\psi}{dt} = H(\psi_x) - \psi_x H'(\psi_x).
+\end{equation}
+
+定义 $g = (x_s^2 + y_s^2)^{1/2}$ 和 $\theta = \tan^{-1}(y_s/x_s)$。
+对于以恒定速度运动的曲线，$H''(\tan(\theta)) = C(\cos\theta)^{-3}$，系统变为线性：
+\begin{equation}
+\frac{\partial}{\partial t}\begin{pmatrix} g \\ \theta \end{pmatrix}
++ \begin{pmatrix} 0 & C \\ C & 0 \end{pmatrix}
+\frac{\partial}{\partial s}\begin{pmatrix} g \\ \theta \end{pmatrix} = 0.
+\label{eq:A.3}
+\end{equation}
+这是一个\textbf{轻微不适定的非严格双曲系统}。然而，精确解容易看出为
+\begin{equation}
+g(s,t) = g_0(s - Ct) + g_0(s + Ct),
+\end{equation}
+该解"失去"了一个导数。
+
+这种线性不适定性表现为 $g(s,t)$ 变为零，这对应原始问题中式 (\ref{eq:A.1}) 
+特征线的相交，时间 $t_{\text{crit}} = \min(-g_0(s)/(\theta_s)_0(s))$。
+
+对一般凹 Hamilton-Jacobi 方程（$H'' < 0$），临界时间为
+\begin{equation}
+t_{\text{crit}} = \min\left(\frac{-(1 + (\psi_0')^2)^{3/2}}{H''(\psi_0')\,\psi_0''}\right),
+\end{equation}
+因此由初始曲线的二阶导数（当写成 $y = \psi(x,0)$ 时）决定。
+
+\textbf{实例说明。} 考虑平坦初始数据 $\psi(x,0) = 0$。以单位速度运动的前沿的真实解仅为 $x = s, y = s + t$。
+现考虑一序列初始数据，当初始空间步长加密时收敛到上述平坦数据。取
+\begin{equation}
+y_0(s) = -\Delta s(\sin(s/\Delta s)^{1/2}),
+\end{equation}
+在网格 $j\Delta s = 0, 3\Delta s/2, \ldots$ 上定义。当 $\Delta s \to 0$ 时，离散初始数据在最大范数下收敛到平坦直线 $y=0$。
+然而，标记粒子数值格式（不重新布点）在 $O(1/(\Delta s)^{1/2})$ 时间步后崩溃。
+对于任何形式为 $\Delta t = (\Delta s)^p$（$p > 1/2$）的 $\Delta t$ 和 $\Delta s$ 关系，
+实际数值崩溃时间为 $O(\Delta t) \times O(1/(\Delta s)^{1/2}) = O((\Delta s)^{p-1/2})$，
+随着 $\Delta s$ 消失而趋于零，尽管真实解对所有时间都是有限的（事实上，所有导数都为零）。
+
+\newpage
+
+% ============================================================
+\section{一般 ENO 构造}
+\label{app:B}
+% ============================================================
+
+我们通过归纳法构建 $R^M$。在每个单元 $x_j \leq x \leq x_{j+1}$ 中，$R^M$ 定义如下：
+\begin{equation}
+R^1(x; \Psi^n) = \psi_j^n + (x - x_j) D^+\psi_j^n
+= \psi_j^n + (x - x_j) \nu[x_j; x_{j+1}],
+\end{equation}
+其中 $\nu[x_{j-p}, \ldots, x_{j+q}]$ 表示 Newton 插值多项式中通常的系数。
+我们也定义 $k_{\min}^{(1)} = j$，$k_{\max}^{(1)} = j+1$。
+
+假设我们已为 $x_j \leq x \leq x_{j+1}$ 定义了 $R^{M-1}(x; \Psi^n)$，
+以及 $k_{\min}^{(M-1)}$ 和 $k_{\max}^{(M-1)}$（分别为最左和最右的指标）。
+然后我们计算
+\begin{align}
+a_M &= \nu[x_{k_{\min}^{(M-1)}-1}, \ldots, x_{k_{\max}^{(M-1)}}], \\
+b_M &= \nu[x_{k_{\min}^{(M-1)}}, \ldots, x_{k_{\max}^{(M-1)}+1}],
+\end{align}
+并归纳地进行。
+
+\begin{itemize}
+    \item 若 $|a_M| \geq |b_M|$，则在此区间内
+    \begin{equation}
+    R^M(x; \Psi^n) = R^{M-1}(x; \Psi^n) + a_M \prod_{i=k_{\min}^{(M-1)}-1}^{k_{\max}^{(M-1)}-1} (x - x_i),
+    \end{equation}
+    其中 $k_{\min}^{(M)} = k_{\min}^{(M-1)} - 1$，$k_{\max}^{(M)} = k_{\max}^{(M-1)}$。
+
+    \item 若 $|a_M| < |b_M|$，则在此区间内
+    \begin{equation}
+    R^M(x; \Psi^n) = R^{M-1}(x; \Psi^n) + b_M \prod_{i=k_{\min}^{(M-1)}}^{k_{\max}^{(M-1)}} (x - x_i),
+    \end{equation}
+    其中 $k_{\min}^{(M)} = k_{\min}^{(M-1)}$，$k_{\max}^{(M)} = k_{\max}^{(M-1)} + 1$。
+\end{itemize}
+
+\textbf{总结：} 在每个单元 $x_j \leq x \leq x_{j+1}$ 中，我们构造了一个 $M$ 阶本质无振荡多项式。
+该多项式是插值 $\psi_j^n$ 于 $M+1$ 个连续点（包括 $x_j$ 和 $x_{j+1}$）的多项式在该单元上的限制；
+此外，这些点的选取使得多项式的所有导数在绝对值上尽可能小。
+
+\newpage
+
+% ============================================================
+\begin{thebibliography}{99}
+% ============================================================
+
+\bibitem{barles1985}
+G.~Barles,
+\emph{Remarks on a Flame Propagation Model},
+INRIA Report No.~464, Sophia Antipolis, France, 1985.
+
+\bibitem{brakke1978}
+K.A.~Brakke,
+\emph{The Motion of a Surface by Its Mean Curvature},
+Princeton University Press, Princeton, NJ, 1978.
+
+\bibitem{chorin1985}
+A.J.~Chorin,
+Curvature and solidification,
+\emph{J. Comp. Phys.}, 57:472--490, 1985.
+
+\bibitem{chorin1980}
+A.J.~Chorin,
+Flame advection and propagation algorithms,
+\emph{J. Comp. Phys.}, 35:1--11, 1980.
+
+\bibitem{crandall1984}
+M.G.~Crandall and P.L.~Lions,
+\emph{Math. Comp.}, 43:1--19, 1984.
+
+\bibitem{frankel1982}
+M.L.~Frankel and G.I.~Sivashinsky,
+\emph{Comb. Sci. Tech.}, 29:207--224, 1982.
+
+\bibitem{gage1983}
+M.~Gage,
+\emph{Duke Math. J.}, 50:1225--1229, 1983.
+
+\bibitem{gage1984}
+M.~Gage,
+\emph{Invent. Math.}, 76:357--364, 1984.
+
+\bibitem{gage1986}
+M.~Gage and R.S.~Hamilton,
+\emph{J. Diff. Geom.}, 23:69--81, 1986.
+
+\bibitem{grayson1987}
+M.~Grayson,
+The heat equation shrinks embedded plane curves to round points,
+\emph{J. Diff. Geom.}, 26:285--314, 1987.
+
+\bibitem{grayson1987b}
+M.~Grayson,
+A short note on the evolution of a surface via mean curvature,
+Stanford University Mathematics Dept. preprint, 1987.
+
+\bibitem{godunov1959}
+S.K.~Godunov,
+\emph{Mat. Sb.}, 47:271--306, 1959.
+
+\bibitem{harten1987}
+A.~Harten, B.~Engquist, S.~Osher, and S.~Chakravarthy,
+Uniformly high order accurate essentially non-oscillatory schemes III,
+\emph{J. Comput. Phys.}, 71:231--303, 1987.
+
+\bibitem{harten1986}
+A.~Harten, S.~Osher, B.~Engquist, and S.~Chakravarthy,
+\emph{Appl. Num. Math.}, 2:347--377, 1986.
+
+\bibitem{huisken1984}
+G.~Huisken,
+Flow by mean curvature of convex surfaces into spheres,
+\emph{J. Diff. Geom.}, 20:237--266, 1984.
+
+\bibitem{kutnetsov1977}
+N.N.~Kutnetsov,
+On stable methods for solving nonlinear first order partial differential equations in the class of discontinuous functions,
+in \emph{Topics in Numerical Analysis III}, J.J.H.~Miller, Ed., Academic Press, New York, 1977.
+
+\bibitem{kruzkov1970}
+S.N.~Kruz'kov,
+\emph{Math. USSR Sb.}, 10:217--243, 1970.
+
+\bibitem{landau1944}
+L.~Landau,
+On the theory of slow combustion,
+\emph{ACTA Physiocochimica URSS}, 19:77--85, 1944.
+
+\bibitem{langer1980}
+J.S.~Langer,
+Instabilities and pattern formation in crystal growth,
+\emph{Rev. Mod. Phys.}, 52:1--28, 1980.
+
+\bibitem{langer1983}
+J.S.~Langer and H.~Muller-Krumbhaar,
+Mode selection in a dendrite-like nonlinear system,
+\emph{Phys. Rev. A}, 27:499--514, 1983.
+
+\bibitem{lax1957}
+P.D.~Lax,
+\emph{Comm. Pure Appl. Math.}, 10:537--566, 1957.
+
+\bibitem{markstein1951}
+G.H.~Markstein,
+Experimental and theoretical studies of flame front stability,
+\emph{J. Aero. Sci.}, 18:199--209, 1951.
+
+\bibitem{markstein1964}
+G.H.~Markstein,
+\emph{Non-Steady Flame Propagation},
+Pergammon Press, New York, 1964.
+
+\bibitem{mullins1963}
+W.W.~Mullins and R.F.~Sekerka,
+\emph{J. Appl. Phys.}, 34:2885, 1963.
+
+\bibitem{mullins1965}
+W.W.~Mullins and F.A.~Nichols,
+\emph{Trans. Met. Soc. AIME}, 233:1840, 1965.
+
+\bibitem{nichols1965}
+F.A.~Nichols and W.W.~Mullins,
+\emph{Trans. Met. Soc. AIME}, 223:1840, 1965.
+
+\bibitem{noh1976}
+W.~Noh and P.~Woodward,
+A simple line interface calculation,
+\emph{Proceedings, Fifth International Conference on Fluid Dynamics},
+Springer-Verlag, 1976.
+
+\bibitem{osher1984}
+S.~Osher,
+\emph{SIAM J. Num. Anal.}, 21:217--235, 1984.
+
+\bibitem{oleinik1956}
+O.A.~Oleinik,
+\emph{Trudy Moscow Mat. Obsc.}, 5:433--454, 1956.
+
+\bibitem{shu1987}
+C.~Shu and S.~Osher,
+Efficient implementation of essentially non-oscillatory shock capturing schemes,
+\emph{J. Comput. Phys.}, 77:439--471, 1988.
+
+\bibitem{pamphlin1975}
+B.R.~Pamplin,
+\emph{Crystal Growth},
+Pergammon Press, New York, 1975.
+
+\bibitem{sethian1982}
+J.A.~Sethian,
+\emph{An Analysis of Flame Propagation},
+Ph.D. Dissertation, University of California, Berkeley, June 1982; CPAM Rep.~79.
+
+\bibitem{sethian1985}
+J.A.~Sethian,
+Curvature and the evolution of fronts,
+\emph{Comm. Math. Phys.}, 101:487--499, 1985.
+
+\bibitem{sethian1987a}
+J.A.~Sethian,
+Numerical methods for propagating fronts,
+in \emph{Variational Methods for Free Surface Interfaces},
+P.~Concus and R.~Finn, Eds., Springer-Verlag, New York, 1987.
+
+\bibitem{sethian1987b}
+J.A.~Sethian,
+Turbulent combustion in open and closed vessels,
+\emph{J. Comp. Phys.}, 54:425--456, 1984.
+
+\bibitem{sethian1986}
+J.A.~Sethian,
+Large eddy interaction with propagating flames,
+in \emph{Computational Fluid Mechanics and Reacting Gas Flows},
+B.~Engquist, A.~Majda, S.~Osher, Eds., IMA, Univ. of Minn., 1986.
+
+\bibitem{sethian1988}
+J.A.~Sethian and S.~Osher,
+Hamilton-Jacobi based algorithms for interface-media interactions,
+submitted to \emph{J. Comp. Physics}, 1988.
+
+\bibitem{sivashinsky1977}
+G.I.~Sivashinsky,
+Nonlinear analysis of hydrodynamic instability in laminar flames---I,
+\emph{Acta Astronautics}, 4:1177--1206, 1977.
+
+\bibitem{turnbull1956}
+D.~Turnbull,
+Phase changes,
+in \emph{Solid State Physics}, Vol.~3, F.~Seitz and D.~Turnbull, Eds.,
+Academic Press, New York, 1956.
+
+\bibitem{zeldovich1981}
+Y.B.~Zeldovich,
+Structure and stability of steady laminar flame at moderately large Reynolds numbers,
+\emph{Comb. Flame}, 40:225--234, 1981.
+
+\end{thebibliography}
+
+\end{document}

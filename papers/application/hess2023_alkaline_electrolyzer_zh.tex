@@ -1,0 +1,455 @@
+% !TeX program = lualatex
+\documentclass[UTF8,zihao=-4,fontset=fandol]{ctexart}
+\usepackage[a4paper,top=2.2cm,bottom=2.35cm,left=2.35cm,right=2.35cm]{geometry}
+\usepackage{amsmath,amssymb,bm,booktabs,array,graphicx,caption,float,enumitem}
+\usepackage{fancyhdr,microtype,setspace,url}
+\graphicspath{{output/pdf/hess2023_zh_figures/}{hess2023_zh_figures/}}
+\setstretch{1.24}
+\setlength{\parindent}{2em}
+\setlength{\parskip}{0.2em}
+\setlength{\headheight}{14pt}
+\captionsetup{font=small,labelsep=quad}
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small 碱性水电解槽的数值两相模拟}
+\fancyhead[R]{\small Hess 等（2023）}
+\fancyfoot[C]{\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+\ctexset{
+ section={format=\large\bfseries,name={},number=\arabic{section}.,aftername=\quad},
+ subsection={format=\normalsize\bfseries,name={},number=\arabic{section}.\arabic{subsection},aftername=\quad},
+ subsubsection={format=\normalsize\bfseries,name={},number={},aftername={}}
+}
+\newcommand{\vect}[1]{\bm{#1}}
+\title{\bfseries 碱性水电解槽的数值两相模拟\\
+\large Numerical Two-Phase Simulations of Alkaline Water Electrolyzers}
+\author{S. Hess\textsuperscript{a}，S. Zhang\textsuperscript{a}，
+T. Kadyk\textsuperscript{b}，W. Lehnert\textsuperscript{a,e}，\\
+M. Eikerling\textsuperscript{b,c}，S. B. Beale\textsuperscript{b,d}\\[0.7em]
+\small\textsuperscript{a}于利希研究中心能源与气候研究所 IEK-14，德国于利希 52428\\
+\small\textsuperscript{b}于利希研究中心能源与气候研究所 IEK-13，德国于利希 52428\\
+\small\textsuperscript{c}亚琛工业大学地球资源与材料工程学院能源材料理论与计算教席\\
+\small\textsuperscript{d}皇后大学机械与材料工程系，加拿大金斯顿\\
+\small\textsuperscript{e}亚琛工业大学机械工程学院，德国亚琛}
+\date{\small ECS Transactions, 112(4), 419--431 (2023)\\
+\url{https://doi.org/10.1149/11204.0419ecst}}
+
+\begin{document}
+\maketitle
+\thispagestyle{empty}
+\begin{center}\small\itshape 中文翻译稿；公式编号、图号和表号与原文保持一致。\end{center}
+
+\begin{abstract}
+本文给出零间隙碱性水电解槽的计算模拟。所采用模型是以 OpenFOAM 软件库实现的三维、稳态、非等温两相流计算流体力学模型。
+通过引入新的表面耦合和体积耦合策略，在既有界面和不同区域之间连接相互依赖的物理量，
+该实现扩展了开源框架 openFuelCell2 中现有库的能力。
+此外，将 Nernst--Planck 方程纳入欧拉--欧拉两相框架，以描述电解槽内液态电解质的行为。
+
+模型依据不同温度和体积流量下实验测得的极化曲线进行验证，所得结果与实验数据吻合良好。
+所实现模型能够准确预测电解液中的离子输运，并评估生成气相对局部电流密度分布的影响。
+\end{abstract}
+
+\section{引言}
+
+化石燃料的大规模使用伴随着大量温室气体和污染物排放，因此必须开发更清洁、可持续的替代能源。
+水电解槽能够把电能直接转化为化学能，因而受到广泛关注。
+在多种电解槽中，碱性水电解槽（AWE）具有高效率、较低成本和结构简单等突出优点，
+这主要归因于其电极可采用镍、铁等非贵金属催化剂\textsuperscript{[1,2]}。
+
+高电导率、高泡点的商业隔膜（例如 Zirfon\textsuperscript{\textregistered} Perl UTP 500）
+的发展\textsuperscript{[3,4]}，以及所谓零间隙布置对欧姆电阻的降低\textsuperscript{[5,6]}，
+即使在较高电流密度下也显著提高了效率。
+因此，AWE 已用于大型固定系统和可再生能源驱动制氢等场景\textsuperscript{[7]}。
+然而，当 AWE 由波动性可再生能源供电时，阳极侧与阴极侧之间的气体交叉渗透仍会造成气体杂质和可燃混合气形成，
+这仍是一项主要问题\textsuperscript{[8]}。
+
+气相或气泡形成对碱性电解槽性能的影响，是一个关键研究方向。
+中子成像\textsuperscript{[9]}和同步辐射 X 射线成像\textsuperscript{[10]}可以观察运行中 AWE 的气泡形成，
+但这些实验技术难度较大，适用范围有限。
+相比之下，对三维 AWE 电解槽开展多物理场 CFD 模拟，
+可揭示实验难以或无法测量的局部行为和特征。
+
+Ju 等\textsuperscript{[11]}提出了一种能够模拟零间隙电解槽，以及与电化学反应耦合两相流的三维 CFD 模型；
+随后又使用商用软件 Ansys Fluent 中的非均相欧拉--欧拉混合物方法对其进行了扩展\textsuperscript{[12]}。
+Schimpalee 等提出了另一种用于此类电解槽的三维 CFD 模型，
+采用伪两相流模型，并强调三维建模在捕捉几何相关现象方面的重要性\textsuperscript{[13]}。
+
+本文针对零间隙碱性电解槽这一特殊情形扩展集成于 OpenFOAM 的 openFuelCell2 库\textsuperscript{[14]}，
+并考虑液态电解质中的带电组分。
+所开发的三维电解槽模型能够在连续介质尺度模拟主要物理化学与流体动力学过程，
+包括两相流、传热传质、电化学反应以及物种与电荷输运。
+为分别描述两相流中各相的行为，采用考虑相间动量传递的欧拉--欧拉方法。
+多孔结构中的液态水输运和相关毛细压力采用经验 Leverett \(J\) 函数方法\textsuperscript{[15]}。
+模型采用适当的映射函数与边界条件，在几何重叠的区域和部件之间建立耦合。
+
+\section{耦合策略与数值模拟}
+
+碱性电解槽模拟是一个复杂的多物理场问题，涉及传热传质、电化学反应、动量守恒、物种输运和电势。
+这些现象相互依赖，必须以耦合方式求解，才能正确捕捉其相互作用。
+
+\subsection{几何结构}
+
+图~\ref{fig:hess_regions} 给出了分解后的碱性电解槽横截面、组成部件和耦合策略。
+与真实电解槽一样，模型包括双极板（互连板）、流场（阴极/阳极通道）、电极（阴极/阳极）和隔膜。
+计算域分解后形成若干子域/区域；不同方程在各区域及其网格上同步求解。
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.92\textwidth]{fig01_regions.png}
+\caption{电解槽部件、计算域及其分解：（a）主区域；（b）流体与固体区域；（c）电子/离子电势区域。}
+\label{fig:hess_regions}
+\end{figure}
+
+\subsection{基本假设}
+\begin{enumerate}[leftmargin=3em,itemsep=0.15em]
+\item 模拟为稳态；
+\item 气体和液体均为不可压缩层流；
+\item 气体服从理想气体定律；
+\item 多孔电极性质均匀且各向同性；
+\item 氧气和氢气均以气态生成；
+\item 隔膜不透气；
+\item 液态电解质在任意位置均满足电中性；
+\item 电解质相为高度稀释体系；
+\item 不考虑相间质量或热量传递；
+\item 液态电解质中不存在溶解气体组分；
+\item 分散气相视为球形气泡。
+\end{enumerate}
+
+\subsection{控制方程}
+
+图~\ref{fig:hess_regions} 中各区域求解不同的输运方程。
+在流体子区域，分别对各相求解加入 Darcy 汇项的修正 Navier--Stokes 方程，
+同时计算传热、物种输运、电化学迁移和过电势。
+\emph{electrolyteSpecie} 区域考虑液态电解质内的传热和物种输运；
+电势方程在 \emph{phiEA}、\emph{phiEC} 和 \emph{phiI} 区域中求解；
+主区域求解全局能量方程。
+气液两相共享同一压力（仅相差一个代数项）。
+因此，将混合物连续性方程代入动量方程，构造共同压力的求解方程。
+压力--速度耦合采用分离式隐式压力算子分裂（PISO）算法\textsuperscript{[16]}。
+
+\subsubsection{流体区域}
+\begin{align}
+\frac{\partial}{\partial t}(s_q\rho_q)+
+\nabla\cdot(s_q\rho_q\vect{U}_q)&=R_q, \tag{1}\\
+\frac{\partial}{\partial t}(s_q\rho_q\vect{U}_q)+
+\nabla\cdot(s_q\rho_q\vect{U}_q\vect{U}_q)
+&=-s_q\nabla p+\nabla\cdot(s_q\mu_q\nabla\vect{U}_q)
+s_q\rho_q\vect{g}+\vect{M}_q+s_qS_{\mathrm{Darcy},q}, \tag{2}\\
+\frac{\partial(\rho_qs_qY_i)}{\partial t}
+\nabla\cdot(s_q\rho_q\vect{U}_qY_i)
+&=\nabla\cdot(s_q\rho_qD_i^{\mathrm{eff}}\nabla Y_i)
+\nabla\cdot(s_qu_i\rho_qY_i\nabla\Phi)+s_qR_{i,q}, \tag{3}\\
+\frac{\partial(s_q\rho_qh_q)}{\partial t}
+\nabla\cdot(s_q\rho_q\vect{U}_qh_q)
+&=\nabla\cdot(s_q\Gamma_q\nabla h_q)+s_q\dot Q_q. \tag{4}
+\end{align}
+
+阳极和阴极的电流密度采用温度修正的 Butler--Volmer 形式：
+\begin{align}
+j_a={}&\exp\!\left[\frac{E_{a,a}}{R}\left(\frac{1}{T_{\mathrm{ref}}}-\frac{1}{T}\right)\right]
+i_{a,0}s_l^\gamma\prod_i
+\left[
+\exp\!\left(\frac{\alpha_a zF\eta_a}{R_gT}\right)
+-\exp\!\left(-\frac{(1-\alpha_a)zF\eta_a}{R_gT}\right)
+\right], \tag{5}\\
+j_c={}&\exp\!\left[\frac{E_{a,c}}{R}\left(\frac{1}{T_{\mathrm{ref}}}-\frac{1}{T}\right)\right]
+i_{c,0}s_l^\gamma\prod_i
+\left[
+\exp\!\left(-\frac{\alpha_c zF\eta_c}{R_gT}\right)
+-\exp\!\left(\frac{(1-\alpha_c)zF\eta_c}{R_gT}\right)
+\right]. \tag{6}
+\end{align}
+
+\subsubsection{电解质物种区域}
+\begin{equation}
+\frac{\partial(\rho_ls_lY_i)}{\partial t}
+\nabla\cdot(s_l\rho_lD_i^{\mathrm{eff}}\nabla Y_i)
+\nabla\cdot(s_lu_i\rho_lY_i\nabla\Phi)=0. \tag{7}
+\end{equation}
+
+\subsubsection{电子/离子电势区域}
+\begin{align}
+\nabla\cdot(\sigma_E\nabla\Phi_E)&=J_E, \tag{8}\\
+\nabla\cdot(\sigma_I\nabla\Phi_I)+
+\nabla\cdot\!\left(s_lz_{\mathrm{OH^-}}FD_{\mathrm{OH^-}}^{\mathrm{eff}}
+\nabla C_{\mathrm{OH^-}}\right)&=J_I. \tag{9}
+\end{align}
+
+\subsubsection{主区域}
+\begin{equation}
+\frac{\partial(\rho C_pT)}{\partial t}+\rho C_p\vect{U}\cdot\nabla T
+=\nabla\cdot(k^{\mathrm{eff}}\nabla T)+\dot Q. \tag{10}
+\end{equation}
+对于稀溶液，离子迁移率由 Nernst--Einstein 方程\textsuperscript{[17]}计算：
+\begin{equation}
+u_i=D_i^{\mathrm{eff}}\frac{Fz_i}{RT}. \tag{11}
+\end{equation}
+
+\subsection{耦合边界条件}
+
+在 \emph{fluid} 和 \emph{electrolyteSpecies} 区域内均求解
+\(\mathrm{OH^-}\)、\(\mathrm{K^+}\) 与 \(\mathrm{H_2O}\) 的物种输运方程。
+方程通过对应界面的边界条件耦合；界面一侧采用 Dirichlet 条件
+\begin{equation}
+Y_{i,\mathrm{left}}=\xi Y_{i,\mathrm{right}}, \tag{12}
+\end{equation}
+其中无跳跃时 \(\xi=1\)；另一侧采用考虑通量的 Neumann 条件
+\begin{equation}
+\rho D_i^{\mathrm{eff}}\nabla Y_i+s_lu_i\rho_lY_i\nabla\Phi=J. \tag{13}
+\end{equation}
+因此，界面两侧的通量大小及物种质量分数必须相等。
+
+\section{几何模型与问题描述}
+
+实验所用电解槽的原始几何结构见图~\ref{fig:hess_geometry}（a），
+其流场见图~\ref{fig:hess_geometry}（b）。
+为降低计算成本，将几何模型简化为图~\ref{fig:hess_geometry}（c）的形式。
+简化后的电解槽具有 14 条平行直通道，
+使用 OpenFOAM 的 \emph{blockMesh} 工具生成由 375\,000 个纯六面体单元组成的网格。
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.92\textwidth]{fig02_geometry.png}
+\caption{实验用 AWE 电解槽几何结构（a、b）及简化后的计算域（c）。}
+\label{fig:hess_geometry}
+\end{figure}
+
+\subsection{电解槽设计与运行条件}
+
+多孔电极由镍制成，隔膜采用 Zirfon PERL UTP 500\textsuperscript{[18]}。
+几何参数、运行条件和模型参数分别列于表~\ref{tab:hess_geo}--\ref{tab:hess_model}。
+
+\begin{table}[H]\centering
+\caption{几何参数。}\label{tab:hess_geo}
+\begin{tabular}{ll}\toprule 描述&数值\\\midrule
+通道高度&\(1.5~\mathrm{mm}\)\\
+通道宽度&\(1.5~\mathrm{mm}\)\\
+肋宽&\(1.5~\mathrm{mm}\)\\
+通道数&14\\
+阴极/阳极厚度&\(0.5~\mathrm{mm}\)\\
+有效表面积&\(18.27~\mathrm{cm^2}\)\\
+隔膜厚度&\(0.5~\mathrm{mm}\)\\\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[H]\centering
+\caption{运行条件。}\label{tab:hess_operating}
+\begin{tabular}{lll}\toprule 描述&数值&单位\\\midrule
+阳极和阴极压力&101325&Pa\\
+入口温度&\(50<T<70\)&\(^\circ\mathrm{C}\)\\
+入口 KOH 质量分数&30&\%\\
+入口液态水饱和度&1&--\\
+体积流量&100&\(\mathrm{ml/s}\)\\\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[H]\centering\small
+\caption{模型参数。}\label{tab:hess_model}
+\begin{tabular}{p{6.6cm}p{4.5cm}l}\toprule 描述&数值&单位\\\midrule
+电极孔隙率（镍泡沫）&0.96&--\\
+隔膜孔隙率（Zirfon PERL UTP 500）&0.55\textsuperscript{[18]}&--\\
+气泡直径&\(\mathrm{O_2}:1.15\times10^{-4}\)，\(\mathrm{H_2}:2\times10^{-4}\)&m\\
+电解质扩散系数（参考温度 \(25^\circ\mathrm{C}\)）&
+\(\mathrm{OH^-}:5.26\times10^{-9}\)，\(\mathrm{K^+}:1.957\times10^{-9}\)，
+\(\mathrm{H_2O}:2.272\times10^{-9}\)&\(\mathrm{m^2/s}\)\\
+电极渗透率&1265914（原文数值）&\(\mathrm{m^2}\)\\
+传递系数&阳极 0.4256；阴极 0.3725&--\\
+固体电导率&\(10^6\)&S/m\\
+交换电流密度（参考温度 \(25^\circ\mathrm{C}\)）&
+阳极 9.3\textsuperscript{[12]}；阴极 23.4\textsuperscript{[12]}&\(\mathrm{A/m^2}\)\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+模拟中的碱性电解槽以恒电流模式运行，即向电解槽施加指定的平均电流密度。
+液态电解质的材料性质汇总于附录，采用随温度和 KOH 溶液质量分数变化的经验关系。
+
+\section{结果与讨论}
+
+所实现求解器首先在更简单的几何模型上进行了成功测试，包括无流道和单流道算例；
+这些算例的入口条件均按修改后的入口面积进行调整。
+下述结果对应图~\ref{fig:hess_geometry}（c）的几何模型。
+图~\ref{fig:hess_polarization} 比较了恒定体积流量下不同温度的模拟和实验极化曲线。
+
+\begin{figure}[H]\centering
+\includegraphics[width=0.78\textwidth]{fig03_polarization.png}
+\caption{体积流量恒为 \(\dot V=100~\mathrm{ml/s}\) 时，不同温度下实验与数值模拟获得的极化曲线。}
+\label{fig:hess_polarization}
+\end{figure}
+
+实验数据与数值模拟总体吻合良好，
+尽管描述动力学的数据主要取自文献，并非针对实验所用电极专门测量。
+以 openFuelCell2 框架为基础、针对另一种电解槽的进一步验证研究见文献\textsuperscript{[19]}。
+图~\ref{fig:hess_saturation} 给出了液态水饱和度沿电解槽流动方向的变化。
+
+\begin{figure}[H]\centering
+\includegraphics[width=0.95\textwidth]{fig04_saturation.png}
+\caption{\(1~\mathrm{A/cm^2}\) 下，不同通道横截面和电极内部的液态水饱和度分布。}
+\label{fig:hess_saturation}
+\end{figure}
+
+阳极和阴极分别生成氧气与氢气，使液态水饱和度沿流动方向下降。
+阴极侧的液相减少更明显，因为每传递一个离子，生成的氢气量是氧气的两倍。
+肋下液态水饱和度也明显低于通道下方，这是肋下对流输运减弱所致。
+这一差异会影响液态电解质中的物种浓度。
+
+图~\ref{fig:hess_concentration} 左侧给出前七条通道中 \(\mathrm{OH^-}\) 的摩尔浓度，
+右侧给出其余七条通道中水分子的摩尔浓度。
+通道下方多孔电极内的浓度与通道内浓度十分接近；
+但在肋下，浓度出现明显变化：反应消耗的物种发生贫化，反应生成的物种发生积聚。
+
+\begin{figure}[H]\centering
+\includegraphics[width=0.98\textwidth]{fig05_concentration.png}
+\caption{\(1~\mathrm{A/cm^2}\) 下，电解液中氢氧根离子（左）和水（右）沿通道及电极内部的摩尔浓度分布。}
+\label{fig:hess_concentration}
+\end{figure}
+
+图~\ref{fig:hess_current}（a）显示隔膜与阳极界面的电流密度分布。
+肋下电流密度较低、通道下较高，与图~\ref{fig:hess_saturation} 中液态水饱和度的趋势一致，
+说明饱和度通过式（5）和（6）影响电流密度。
+肋下过电势较高，因而这些区域的电流密度降低。
+图~\ref{fig:hess_current}（b）显示催化层内电流密度分布明显不均匀；
+最高电流密度和最高反应速率出现在界面处。
+此外，电流密度朝通道出口方向降低，这也会促使气相饱和度升高。
+
+\begin{figure}[H]\centering
+\includegraphics[width=0.94\textwidth]{fig06_current_density.png}
+\caption{\(1~\mathrm{A/cm^2}\) 下，阳极--隔膜界面电解质中的电流密度分布（a），
+以及沿通道和电极内部的电流密度分布（b）。}
+\label{fig:hess_current}
+\end{figure}
+
+\section{总结与未来工作}
+
+本研究在 OpenFOAM 的 openFuelCell2 库中实现了 AWE 三维两相模型。
+该模型能够捕捉电化学反应、传热和传质等关键物理过程。
+
+模型用于自主开发零间隙 AWE 电解槽的三维简化几何结构，
+并依据恒定体积流量下不同温度的实验极化曲线进行验证。
+在最高 \(1~\mathrm{A/cm^2}\) 的宽电流密度范围内，模型预测的极化曲线与实验数据吻合良好。
+该框架还可考察局部液相饱和度变化及其对槽内电流密度分布的影响；
+这些信息可以表征运行电解槽不同区域的活性，并可用于优化几何结构以提升性能。
+
+未来工作将提高两相系统求解的数值稳定性和收敛速度，
+重点研究部分消去算法和一致动量插值技术\textsuperscript{[20]}。
+另一个需要研究的问题，是 Nernst--Planck 方程中物种输运与电势方程的耦合；
+同时还将采用改进的区域耦合方法处理物种输运方程。
+
+\appendix
+\section{电解液材料性质}
+
+\subsection{密度\textsuperscript{[21]}}
+\[
+\rho_{\mathrm{KOH}}=
+\left(K_1(T-T_{\mathrm{ref}})^2+K_2(T-T_{\mathrm{ref}})+K_3\right)
+\exp(K_4Y_{\mathrm{KOH}}),
+\]
+\[
+K_1=-3.25\times10^{-3},\quad K_2=0.111,\quad K_3=1000,\quad K_4=0.86.
+\]
+
+\subsection{动力黏度\textsuperscript{[21]}}
+\[
+\mu_{\mathrm{KOH}}=
+\exp\!\left(K_{\mu1}+K_{\mu2}(T-T_{\mathrm{ref}})
++K_{\mu3}(T-T_{\mathrm{ref}})^2+K_{\mu4}Y_{\mathrm{KOH}}\right),
+\]
+\[
+K_{\mu1}=0.43,\quad K_{\mu2}=-2.52\times10^{-2},\quad
+K_{\mu3}=1\times10^{-4},\quad K_{\mu4}=0.13.
+\]
+
+\subsection{定压比热容\textsuperscript{[21]}}
+\begin{align*}
+c_{p,\mathrm{KOH}}={}&K_{c_p,1}+K_{c_p,2}
+\ln\!\left(K_{c_p,5}(T-T_{\mathrm{ref}})/100\right)\\
+&+\left(K_{c_p,a}+K_{c_p,4}Y_{\mathrm{KOH}}
++8K_{c_p,6}(T-T_{\mathrm{ref}})\right)Y_{\mathrm{KOH}},
+\end{align*}
+\[
+K_{c_p,1}=4.236\times10^3,\ K_{c_p,2}=1.075,\ K_{c_p,3}=-4.831\times10^3,\ 
+K_{c_p,4}=8,\ K_{c_p,5}=1,\ K_{c_p,6}=1.
+\]
+
+\subsection{导热系数\textsuperscript{[21]}}
+\[
+\kappa_{\mathrm{KOH}}=
+K_{\kappa5}\left(K_{\kappa1}+K_{\kappa5}(T-T_{\mathrm{ref}})
+-K_{\kappa3}(T-T_{\mathrm{ref}})^2\right)
+\left(1-Y_{\mathrm{KOH}}K_{\kappa4}\right),
+\]
+\[
+K_{\kappa1}=0.5545,\quad K_{\kappa2}=2.46\times10^{-3},\quad
+K_{\kappa3}=1.184\times10^{-5},\quad K_{\kappa4}=0.128,\quad K_{\kappa5}=1.
+\]
+
+\subsection{离子电导率\textsuperscript{[22]}}
+\[
+\sigma_{\mathrm{KOH}}=100\left(\frac{\varepsilon}{\tau}\right)
+\left(K_{\sigma,1}M+K_{\sigma,2}M^2+K_{\sigma,3}MT
++K_{\sigma,4}\frac{M}{T}+K_{\sigma,5}M^3+K_{\sigma,6}M^2T^2\right),
+\]
+\begin{align*}
+K_{\sigma,1}&=-2.041,& K_{\sigma,2}&=-2.8\times10^{-3},&
+K_{\sigma,3}&=5.33\times10^{-3},\\
+K_{\sigma,4}&=207.2,& K_{\sigma,5}&=1.043\times10^{-3},&
+K_{\sigma,6}&=-3\times10^{-7}.
+\end{align*}
+
+\section*{符号说明}
+\small
+\begin{tabular}{>{$}l<{$}p{11.5cm}}
+c_p&定压比热容，J/(kg\,K)；\\ C&摩尔浓度，mol/m\(^3\)；\\
+D&扩散系数，m\(^2\)/s；\\ F&法拉第常数，C/mol；\\
+\vect g&重力，m/s\(^2\)；\\ h&焓，J/kg；\\
+k&导热系数，W/(m\,K)；\\ K&常数；\\
+i,i_0,j&电流密度及交换电流密度；\\ J&电流密度源；\\
+\dot m&质量通量，kg/(m\(^2\)s)；\\
+\vect M&相间动量交换项；\\ p&压力，Pa；\\
+\dot Q&热源，J/m\(^3\)；\\ R&质量源/汇，kg/m\(^3\)；\\
+s&饱和度；\\ S&Darcy 项；\\ T&温度，K；\\
+\vect U&表观速度，m/s；\\ u&离子迁移率；\\ Y&质量分数；\\
+\alpha&热扩散率或传递系数；\\ \varepsilon&孔隙率；\\
+\gamma&饱和度指数；\\ \Phi&电势，V；\\ \eta&活化过电势，V；\\
+\rho&密度，kg/m\(^3\)；\\ \kappa&导热系数；\\
+\sigma&电子/离子电导率，S/m；\\ \mu&动力黏度；\\
+\tau&曲折度；\\ \xi&边界跳跃系数。
+\end{tabular}
+\normalsize
+
+\section*{致谢}
+本工作部分得到 AIDAS（人工智能、数据分析与可扩展模拟）的支持。
+AIDAS 是由德国于利希研究中心（FZJ）和法国原子能与替代能源委员会（CEA）共同组成的联合虚拟实验室。
+特别感谢 FZJ IEK-14 的 Stefanie Renz 提供实验数据。
+
+\section*{参考文献}
+\begin{enumerate}[label={[\arabic*]},leftmargin=2.7em,itemsep=0.2em]\small
+\item S. A. Grigoriev, V. N. Fateev, P. Millet, \emph{Comprehensive Renewable Energy}, 2nd ed., Elsevier, 459--472 (2022).
+\item O. Schmidt et al., \emph{Int. J. Hydrogen Energy}, 42(52), 30470--30492 (2017).
+\item P. Vermeiren, W. Adriansens, R. Leysen, \emph{Int. J. Hydrogen Energy}, 21(8), 679--684 (1996).
+\item P. Vermeiren, J. P. Moreels, R. Leysen, \emph{J. Porous Mater.}, 3, 33--40 (1996).
+\item J. W. Haverkort, H. Rajaei, \emph{Journal of Power Sources}, 497 (2021).
+\item C. Dunningill, R. Phillips, \emph{RSC Adv.}, 6, 100643--100651 (2016).
+\item J. Brauns, T. Turek, \emph{Processes}, 8(2), 248 (2020).
+\item Y. Xia, H. Cheng, W. Wei, \emph{Commun. Eng.} (2023).
+\item O. Panchenko et al., \emph{Journal of Power Sources}, 390, 108--115 (2018).
+\item M. A. Hoeh et al., \emph{Electrochemistry Communications}, 55, 55--59 (2015).
+\item J. Hyunchul, A. Afroz, L. Jaeseung, \emph{Int. J. Hydrogen Energy}, 46(26), 13678--13690 (2021).
+\item J. Hyunchul et al., \emph{Fuel}, 315 (2022).
+\item S. Shimpalee et al., \emph{Electrochimica Acta}, 390 (2021).
+\item S. Zhang et al., openFuelCell2: A New Computational Tool for Fuel Cells, Electrolyzers, and Other Electrochemical Devices and Processes, \emph{Computer Physics Communications} (2023), in preparation.
+\item K. S. Udell, \emph{International Journal of Heat and Mass Transfer}, 28(2), 485--495 (1985).
+\item R. I. Issa, \emph{Journal of Computational Physics}, 62(1), 40--65 (1986).
+\item J. Newman, K. Thomas-Alyea, \emph{Electrochemical Systems}, 3rd ed., Wiley (2012).
+\item Agfa, Technical Data Sheet ZIRFON PERL UTP 500 (2020).
+\item S. Zhang et al., \emph{ECS Transactions}, 98(9), 317--329 (2020).
+\item N. Fueyo, A. Cubero, A. Sanchez-Insa, \emph{Computers and Chemical Engineering}, 62, 96--107 (2014).
+\item P. Mandin et al., \emph{Int. J. Hydrogen Energy}, 44(10), 4553--4569 (2019).
+\item A. Hodges et al., \emph{Journal of Chemical \& Engineering Data}, 68(7), 1485--1506 (2023).
+\end{enumerate}
+
+\vfill
+\begin{center}\small\itshape
+翻译依据：Hess 等（2023）原始 PDF。图内英文标注保留原貌。
+\end{center}
+\end{document}

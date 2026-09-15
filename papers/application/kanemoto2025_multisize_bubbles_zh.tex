@@ -1,0 +1,500 @@
+% !TeX program = lualatex
+\documentclass[UTF8,zihao=-4,fontset=fandol]{ctexart}
+\usepackage[a4paper,top=2.15cm,bottom=2.3cm,left=2.3cm,right=2.3cm]{geometry}
+\usepackage{amsmath,amssymb,bm,booktabs,array,graphicx,caption,float,enumitem}
+\usepackage{fancyhdr,microtype,setspace,url}
+\graphicspath{{output/pdf/kanemoto2025_zh_figures/}{kanemoto2025_zh_figures/}}
+\setstretch{1.22}
+\setlength{\parindent}{2em}
+\setlength{\parskip}{0.18em}
+\setlength{\headheight}{14pt}
+\captionsetup{font=small,labelsep=quad}
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small 考虑多种气泡尺寸的碱性水电解槽两相流数值模拟}
+\fancyhead[R]{\small Kanemoto 等（2025）}
+\fancyfoot[C]{\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+\ctexset{
+ section={format=\large\bfseries,name={},number=\arabic{section}.,aftername=\quad},
+ subsection={format=\normalsize\bfseries,name={},number=\arabic{section}.\arabic{subsection},aftername=\quad},
+ subsubsection={format=\normalsize\bfseries,name={},number=\arabic{section}.\arabic{subsection}.\arabic{subsubsection},aftername=\quad}
+}
+\newcommand{\vect}[1]{\bm{#1}}
+\title{\bfseries 考虑多种气泡尺寸的碱性水电解槽两相流数值模拟\\
+\large Numerical Modeling of Two-Phase Flow Considering Multiple Bubble Sizes\\
+in an Alkaline Water Electrolyzer}
+\author{Ryo Kanemoto\textsuperscript{a,*}，Takuto Araki\textsuperscript{b,d}\\
+Ryuta Misumi\textsuperscript{c,d}，Shigenori Mitsushima\textsuperscript{c,d}\\[0.7em]
+\small\textsuperscript{a}横滨国立大学工程科学研究生院，日本神奈川县横滨市\\
+\small\textsuperscript{b}横滨国立大学系统研究部，日本神奈川县横滨市\\
+\small\textsuperscript{c}横滨国立大学材料科学与化学工程部，日本神奈川县横滨市\\
+\small\textsuperscript{d}横滨国立大学先进科学研究院先进化学能源研究中心\\
+\small\textsuperscript{*}\texttt{kanemoto-ryo-dr@ynu.jp}}
+\date{\small \emph{Chemical Engineering Science} 304 (2025) 120986\\
+\url{https://doi.org/10.1016/j.ces.2024.120986}}
+
+\begin{document}
+\maketitle
+\thispagestyle{empty}
+\begin{center}\small\itshape 中文翻译稿；公式编号、图号和章节结构与原文保持一致。\end{center}
+
+\begin{abstract}
+准确描述气泡流动对于预测水电解性能至关重要。
+本研究采用欧拉--欧拉模型模拟碱性水电解槽中的气泡流动，
+将分散气泡相划分为三个尺寸等级：\(30~\mu\mathrm{m}\)（小）、\(90~\mu\mathrm{m}\)（中）和
+\(270~\mu\mathrm{m}\)（大）。
+在三种电流密度下分别计算各尺寸等级的体积分数场和速度场，发现其流动模式明显不同：
+大气泡直接从出口排出，而较小气泡会被循环液流携带。
+将模拟流场与实验可视化流场比较，验证了模型。
+最后，相比单分散模型和群体平衡模型（PBM）等已有模型，
+本文模型在预测电极附近上升流速度和下降流中气泡下降高度方面表现出优势。
+
+\noindent\textbf{关键词：}碱性水电解；CFD；两相流；多分散相
+\end{abstract}
+
+\section{引言}
+
+传统上，氢气主要由石油炼制过程生产并用于工业。
+随着可再生能源载体需求增长，水电解制氢正受到广泛关注，
+但其占总制氢量的比例仍然很低\textsuperscript{[IEA, 2019]}。
+要改变这一局面，必须显著提高水电解能效并降低制氢成本。
+水电解主要包括质子交换膜型、碱性型和固体氧化物型。
+当使用输出波动且间歇的可再生能源时，理想电解系统应具有较短启动时间和宽负荷调节范围。
+从这一点看，质子交换膜水电解（PEMWE）似乎最合适；
+但目前大规模制氢仍以 AWE 为主，因为其投资成本低，并建立在成熟的氯碱工艺基础上。
+PEMWE 使用铂、铱等贵金属，AWE 使用镍、铁等非贵金属，
+因此 AWE 设备投资更低、寿命更长、年度维护成本也更低。
+
+AWE 的动态性能仍需提高，其启动时间长、对负荷变化响应慢。
+气泡会改变传热和传质方式，是影响动态响应的重要因素之一。
+工业 AWE 通常沿重力方向很长，电极附近气泡体积分数会随位置显著变化，
+使电极处于非均匀工作状态，最终可能导致电极退化。
+因此需要研究气液流动对电化学动态性能的影响。
+实验研究十分重要，但工业尺度 AWE 实验成本高；
+能够描述完整单槽或槽堆的宏观计算模型可提供全面的物性信息。
+
+为此需要耦合流体模型和电化学模型，但耦合过程涉及电极气泡覆盖、气泡间隙内离子输运等复杂因素。
+Hossain 等的准稳态微观耦合模拟表明，由于这些因素难以准确纳入，
+实验和计算电流常常不一致。
+因此本文集中研究流体部分，即气泡--液体流动。
+
+宏观气液流动模型通常分为分离相模型和分散相模型。
+界面捕捉和界面跟踪等分离相方法适合解析气泡表面运动，
+但用于工业尺度 AWE 时计算成本极高。
+典型分散相模型包括欧拉--欧拉和欧拉--拉格朗日模型；
+处理大量气泡时，欧拉--欧拉模型更合适。
+
+一些研究采用单一分散粒径，但电化学生成气泡的尺寸变化很大，
+单分散模型不足以反映不同尺寸气泡行为的差异。
+多分散模型更适合描述水电解槽内的气液流动。
+群体平衡模型（PBM）通过求解数密度函数守恒方程，
+描述分散颗粒尺寸（通常为体积或直径）的数量分布；
+从数密度函数提取 Sauter 直径后，可在欧拉--欧拉 CFD 中估计不同粒径的流场。
+PBM 在多分散系统中已得到有效应用，但大多数对象是简单鼓泡塔。
+
+某些水电解槽内存在循环流。
+由于电化学生成气泡具有宽尺寸分布，各尺寸的速度场往往不同：
+小气泡易被循环液流携带，大气泡则倾向于直接上升。
+PBM 对整个分散相只使用一套动量方程，
+因而难以准确模拟不同粒径具有显著不同速度场的系统。
+本文提出包含多个尺寸等级的多分散模型，每个等级具有独立动量方程，
+既可描述速度大小差异，也能描述速度方向差异，并将其用于碱性水电解槽气液流场。
+
+\section{研究方法}
+
+\subsection{物理装置}
+
+图~\ref{fig:k_cell} 为用于验证 CFD 模型的碱性水电解槽阳极半槽。
+该电解槽为零间隙单极型；由于研究目标是流体流场，模拟只考虑阳极侧。
+KOH 溶液从亚克力壳体底部入口泵入，由中部出口流出。
+镍拉伸网电极分为主电极和小电极，本研究不使用小电极。
+施加电流后，主电极生成氧气泡。
+验证实验的电流密度为 \(j=0.3,\ 0.6,\ 1.0~\mathrm{A/cm^2}\)。
+
+\begin{figure}[H]\centering
+\includegraphics[width=0.68\textwidth]{fig01_cell.png}
+\caption{实验 AWE 阳极半槽结构；蓝色箭头表示电解液流动。未使用的小电极以透明形式显示。}
+\label{fig:k_cell}
+\end{figure}
+
+\subsection{数值模型}
+
+\subsubsection{控制方程}
+
+模拟采用 OpenFOAM v2006 中基于欧拉模型的多相流求解器
+\emph{reactingMultiphaseEulerFoam}。
+该求解器可以处理多种流体组分并分别计算速度场。
+虽然本文不显式求解化学反应，但可把每个气泡尺寸组视为独立组分，
+从而分别求得各尺寸气泡的速度场。
+当引入 \(N\) 个气泡尺寸等级时，模型包含 \(N\) 个气相和一个液相，共 \(N+1\) 相：
+\begin{equation}
+\sum_{i=1}^{N}\alpha_i+\alpha_l=1. \tag{1}
+\end{equation}
+气泡尺寸等级 \(i\) 的连续性与动量方程为
+\begin{align}
+\frac{\partial}{\partial t}(\alpha_i\rho_i)+
+\nabla\cdot(\alpha_i\rho_i\vect u_i)&=\dot m_i, \tag{2}\\
+\frac{\partial}{\partial t}(\alpha_i\rho_i\vect u_i)+
+\nabla\cdot(\alpha_i\rho_i\vect u_i\vect u_i)
+&=-\alpha_i\nabla p+\nabla\cdot(\alpha_i\vect\tau_i)
++\alpha_i\rho_i\vect g+\vect M_{il}. \tag{3}
+\end{align}
+液相方程为
+\begin{align}
+\frac{\partial}{\partial t}(\alpha_l\rho_l)+
+\nabla\cdot(\alpha_l\rho_l\vect u_l)&=0, \tag{4}\\
+\frac{\partial}{\partial t}(\alpha_l\rho_l\vect u_l)+
+\nabla\cdot(\alpha_l\rho_l\vect u_l\vect u_l)
+&=-\alpha_l\nabla p+\nabla\cdot(\alpha_l\vect\tau_l)
++\alpha_l\rho_l\vect g-\vect M_{il}. \tag{5}
+\end{align}
+液相动量方程采用 Reynolds 平均，Reynolds 应力由标准 \(k\)-\(\varepsilon\) 模型描述。
+\(\dot m_i\) 是仅在与电极边界相邻单元中激活的体积质量源。
+应力张量与应变率张量分别为
+\begin{align}
+\vect\tau&=\mu\left[2\vect D-\frac{2}{3}\mathrm{tr}(\vect D)\vect I\right], \tag{6}\\
+\vect D&=\frac12\left[\nabla\vect u+(\nabla\vect u)^\mathsf T\right]. \tag{7}
+\end{align}
+气相黏度取分子动力黏度 \(\mu_i=\mu_g^{\mathrm{mol}}\)，
+液相黏度为 \(\mu_l=\mu_l^{\mathrm{mol}}+\mu_l^{\mathrm{turb}}\)。
+标准 \(k\)-\(\varepsilon\) 模型给出
+\begin{equation}
+\mu_l^{\mathrm{turb}}=C_\mu\frac{\rho_lk^2}{\varepsilon}. \tag{8}
+\end{equation}
+
+尺寸等级 \(i\) 与液相之间的动量交换为阻力、虚质量力、升力、壁面润滑力和湍流扩散力之和：
+\begin{equation}
+\vect M_{il}=\vect F_D+\vect F_{\mathrm{VM}}+\vect F_L+\vect F_{\mathrm{WL}}+\vect F_{\mathrm{TD}}. \tag{9}
+\end{equation}
+阻力为
+\begin{equation}
+\vect F_D=-\frac34\frac{C_D}{d_i}\alpha_i\rho_l
+\lVert\vect u_i-\vect u_l\rVert(\vect u_i-\vect u_l), \tag{10}
+\end{equation}
+其中 Schiller--Naumann 阻力系数为
+\begin{equation}
+C_D=
+\begin{cases}
+\dfrac{24}{\mathrm{Re}_b}\left(1+0.15\mathrm{Re}_b^{0.687}\right),&
+\mathrm{Re}_b\le1000,\\
+0.44,&\mathrm{Re}_b>1000,
+\end{cases}\qquad
+\mathrm{Re}_b=\frac{\rho_l\lVert\vect u_i-\vect u_l\rVert d_i}{\mu_l}. \tag{11}
+\end{equation}
+最大气泡的 Eötvös 数仍约为 \(10^{-2}\)，足以视为球形。
+
+球形颗粒的虚质量系数取 \(C_{\mathrm{VM}}=0.5\)：
+\begin{equation}
+\vect F_{\mathrm{VM}}=C_{\mathrm{VM}}\alpha_i\rho_l
+\left(\frac{D\vect u_i}{Dt}-\frac{D\vect u_l}{Dt}\right). \tag{12}
+\end{equation}
+连续相速度梯度引起的横向升力为
+\begin{equation}
+\vect F_L=C_L\alpha_i\rho_l(\vect u_i-\vect u_l)\times(\nabla\times\vect u_l),
+\qquad C_L=0.5. \tag{13}
+\end{equation}
+为避免壁面附近气相体积分数被高估，采用 Antal 壁面润滑模型：
+\begin{align}
+\vect F_{\mathrm{WL}}&=\frac{C_{\mathrm{WL}}}{d_i}\alpha_i\rho_l
+\lVert(\vect u_i-\vect u_l)_\parallel\rVert^2\vect n_W, \tag{14}\\
+C_{\mathrm{WL}}&=\max\left(0,C_{w1}+C_{w2}\frac{d_i}{2y_W}\right), \tag{15}
+\end{align}
+其中 \(C_{w1}=-0.1\)、\(C_{w2}=0.15\)。
+采用 Burns 模型描述湍流随机脉动造成的横向再分布：
+\begin{equation}
+\vect F_{\mathrm{TD}}=-\frac34\frac{C_D}{d_i}\alpha_i
+\lVert\vect u_i-\vect u_l\rVert
+\frac{\mu_l^{\mathrm{turb}}}{\mathrm{Sc}_{\mathrm{TD}}}
+\left(\frac1{\alpha_i}+\frac1{1-\alpha_i}\right)\nabla\alpha_i,
+\quad \mathrm{Sc}_{\mathrm{TD}}=1.0. \tag{16}
+\end{equation}
+
+模型假设整个计算域内气泡不破碎、不聚并。
+微米尺度气泡不易破碎；主体流中气泡间距通常足够大，聚并并不频繁。
+电极附近输入模型的气泡尺寸已对应聚并后从电极脱离的气泡。
+自由液面或顶部等气泡密集区确实可能频繁聚并，
+但气泡聚并建模不属于本文范围。
+
+\subsubsection{边界条件}
+
+图~\ref{fig:k_geometry} 给出计算几何和主要边界条件。
+所有相在入口采用均匀速度
+\[
+\vect u_i=(-0.032,0,0)~\mathrm{m/s};
+\]
+出口采用定压力；其余边界（包括顶部）均为无滑移壁面；
+各相体积分数在所有边界采用零梯度。
+
+\begin{figure}[H]\centering
+\includegraphics[width=0.90\textwidth]{fig02_geometry.png}
+\caption{生成氧气的阳极半槽计算几何和主要场变量边界条件。}
+\label{fig:k_geometry}
+\end{figure}
+
+式（2）中尺寸等级 \(i\) 的体积质量源为
+\begin{equation}
+\dot m_i=c_i\frac{jM}{C_{\mathrm{reac}}Fd z_{\mathrm{ele}}}, \tag{17}
+\end{equation}
+其中 \(j\) 为电流密度，\(M\) 为生成物摩尔质量，
+\(C_{\mathrm{reac}}\) 为生成一个分子所需电子数，
+\(F\) 为法拉第常数，\(d z_{\mathrm{ele}}\) 为电极表面相邻计算单元宽度。
+分配系数满足 \(\sum_i c_i=1\)，用于将反应生成总质量分配给各尺寸等级。
+在 \(25^\circ\mathrm{C}\) 下气泡内水蒸气质量可忽略；气泡在电极处的初速度取零。
+由于出口压力边界会造成回流，出口实际向远离电极方向延长；图中仅显示必要长度。
+
+\subsection{气泡尺寸等级}
+
+采用 X1、X2 和 X3 三个尺寸等级。
+代表直径 \(d_i\) 与质量分配系数 \(c_i\) 由实验可视化确定。
+视频以 6000 fps、\(1024\times1024\) 像素记录电极底部 \(4~\mathrm{mm}\) 方形区域，
+空间分辨率为 \(3.9~\mu\mathrm{m/pixel}\)。
+设置法向与重力方向平行的控制面，统计随机选取 \(0.02~\mathrm{s}\) 内通过控制面的全部气泡；
+每种电流密度重复三次，总计 \(0.06~\mathrm{s}\)。
+
+\begin{figure}[H]\centering
+\includegraphics[width=0.88\textwidth]{fig03_measurement.png}
+\caption{根据实验可视化视频测量气泡直径。}
+\label{fig:k_measure}
+\end{figure}
+
+气泡质量由状态方程计算：
+\begin{equation}
+P_{\mathrm{in}}\frac43\pi\left(\frac d2\right)^3=\frac mMRT, \tag{18}
+\end{equation}
+气泡内压由 Young--Laplace 方程计算：
+\begin{equation}
+P_{\mathrm{in}}=P_{\mathrm{out}}+\frac{2\gamma}{d/2}. \tag{19}
+\end{equation}
+由此把直径分布转换为质量分布。
+X1--X2 与 X2--X3 的边界分别取 \(60\) 和 \(180~\mu\mathrm{m}\)，
+代表直径固定为 30、90 和 \(270~\mu\mathrm{m}\)。
+质量分配系数是各尺寸等级总质量与全部等级总质量之比。
+固定等级边界和代表直径有利于模型通用性，
+但代表直径变化的影响仍需研究。
+
+\begin{figure}[H]\centering
+\includegraphics[width=0.92\textwidth]{fig04_size_classes.png}
+\caption{（a）气泡直径分布；（b）各直径占总质量的比例；
+（c）各电流密度下三个尺寸等级的质量分配系数。
+蓝色线表示 \(60\) 和 \(180~\mu\mathrm{m}\) 的等级边界。}
+\label{fig:k_classes}
+\end{figure}
+
+\subsubsection{网格无关性}
+
+在 \(0.6~\mathrm{A/cm^2}\) 下比较总网格数
+\(G=7410,\ 18150,\ 72600,\ 290400\) 的四组模拟。
+提取 \(z=0.015~\mathrm{m}\) 处 \(yz\) 平面上的 \(y\) 向分布，
+并在 \(0\le x\le0.03~\mathrm{m}\) 内沿 \(x\) 平均。
+\(G=72600\) 与 \(G=290400\) 的差异很小，
+综合精度和计算成本，采用 \(G=72600\)。
+
+\begin{figure}[H]\centering
+\includegraphics[width=0.62\textwidth]{fig05_grid.png}
+\caption{不同总网格数下的网格无关性检验；插图放大虚线框区域。}
+\label{fig:k_grid}
+\end{figure}
+
+\section{结果与讨论}
+
+\subsection{三个气泡尺寸等级的流场}
+
+图~\ref{fig:k_transient} 给出 \(0.6~\mathrm{A/cm^2}\) 下各相体积分数场的演化。
+\(t=0\) 时施加电流并开始生成气泡。
+所有尺寸的气泡均在浮力作用下加速上升；
+液相受黏性阻力带动，使电极附近上升速度大于入口到出口的平均流速。
+根据连续性方程，亚克力壁面一侧出现下降流，整体形成循环。
+X1 被液体下降流携带，X3 直接进入出口而不随下降流运动，
+X2 同时表现出 X1 和 X3 的特征。
+
+\begin{figure}[H]\centering
+\includegraphics[width=\textwidth]{fig06_transient.png}
+\caption{\(0.6~\mathrm{A/cm^2}\) 下 \(t=0.22,\ 0.52,\ 2.52~\mathrm{s}\) 时，
+X1、X2、X3 和液相体积分数场，以及去除 \(x\) 向分量后的液相速度场。}
+\label{fig:k_transient}
+\end{figure}
+
+这一趋势可由 Stokes 数解释：
+\begin{equation}
+\mathrm{St}=\frac{v_t}{U_l}
+=\frac{\rho_ld^2g}{18\mu_l}\frac1{U_l}. \tag{20}
+\end{equation}
+计算采用 \(\rho_l=1300~\mathrm{kg/m^3}\)、\(g=9.8~\mathrm{m/s^2}\)、
+\(\mu_l=1.63\times10^{-3}~\mathrm{Pa\,s}\)。
+X1 的 Stokes 数在所有电流密度下都远小于 1，因此随液相下降；
+X3 在 0.3 和 \(0.6~\mathrm{A/cm^2}\) 下远大于 1，
+但在 \(1.0~\mathrm{A/cm^2}\) 下略低于 1，因此少量 X3 气泡会随液体向下。
+
+\begin{figure}[H]\centering
+\includegraphics[width=0.96\textwidth]{fig07_stokes.png}
+\caption{（a）红框区域平均液相下降速度及三个电流密度下的 Stokes 数；
+（b）三个电流密度下 X3 的体积分数场。}
+\label{fig:k_stokes}
+\end{figure}
+
+模型能够分别计算各尺寸等级的气泡流场，
+对于槽内设置挡板或管件等复杂系统尤其有用。
+挡板可能增强整体循环并改善电解性能，但只考虑单一气泡尺寸会遗漏多尺寸效应。
+与仅含单一尺寸的伪单分散模型相比，
+本文模型在电极上缘拐角区域预测出明显指向远离电极方向的高速流，
+而伪单分散模型未显示这一现象。
+
+\subsection{与实验流场比较的模型验证}
+
+三种电流密度下总体趋势相似，但气泡下降流高度明显不同。
+本文把该高度定义为从几何顶部沿 \(y\) 方向到气泡下降流底端的长度。
+实验在三种稳态电流密度下从侧面拍摄槽内流动；
+下降流高度随时间波动，因此将 20 秒视频时间平均并转换为灰度图。
+模拟中，总气相体积分数在 \(x=0\) 至 \(30~\mathrm{mm}\) 范围沿 \(x\) 平均。
+
+从 A--A' 线上提取模拟气相体积分数和实验灰度分布。
+虽然灰度变化不一定与气相体积分数线性对应，但两者正相关，
+因此在 \(y=29\) 至 \(56~\mathrm{mm}\) 范围，以目标量降至最大值 20\% 的位置进行定量比较。
+实验中下降高度随电流密度增加而增大，模拟成功复现该趋势，定量结果也吻合良好。
+
+\begin{figure}[H]\centering
+\includegraphics[width=0.98\textwidth]{fig08_validation.png}
+\caption{模拟与实验可视化比较：（a）\(0.6~\mathrm{A/cm^2}\) 下沿电极宽度平均的模拟液相体积分数；
+（b）同工况 20 秒时间平均实验图像；（c）各电流密度下模拟 A--A' 线气相体积分数；
+（d）实验 A--A' 线灰度分布。}
+\label{fig:k_validation}
+\end{figure}
+
+模拟中从 0.6 到 \(1.0~\mathrm{A/cm^2}\) 的下降高度增幅大于实验。
+实验中气泡还会从顶部排出；高电流密度生成更多大气泡并增强上升流，
+使更多小、中气泡进入顶部气泡池并最终从顶部排出。
+模型没有这一机制，因此实验中本应进入气泡池的气泡在模拟中仍被下降液流携带，
+导致模拟下降高度偏大。
+这一偏差不是模型的根本问题，但后续需要加入聚并模型。
+
+\subsection{相对于现有模型的优势}
+
+将本文模型与 PBM 和单分散模型比较。
+对于上升流速度和下降流高度，本文模型均具有优势。
+大气泡占生成气泡总质量的大部分，主导液相速度场；
+要准确预测电极附近上升流，必须在模型中包含大气泡。
+若单分散模型选择小或中等气泡作为代表粒径，上升流速度会被低估。
+
+为证明这一点，开展仅含 \(90~\mu\mathrm{m}\) 中等气泡的伪单分散模拟。
+在实验高速视频中，30 个 \(90~\mu\mathrm{m}\) 气泡的平均下降速度为
+\(0.030~\mathrm{m/s}\)。
+三尺寸模型和伪单分散模型在对应区域的 X2 平均速度分别为
+\(0.028\) 和 \(0.005~\mathrm{m/s}\)；
+前者接近实验，后者显著偏低，说明伪单分散模型对上升液流的预测不足。
+若单分散模型以大气泡为代表，可改善上升流预测，PBM 也能较好预测上升流。
+
+但预测下降流气相体积分数必须考虑小气泡。
+以大气泡为代表的单分散模型会使下降流气相体积分数为零。
+以小气泡为代表的模型虽然可能给出接近实验的下降高度，
+却会同时低估上升流速度。
+PBM 包含小气泡，能够模拟其被下降流携带，
+但全部粒径共享一套动量方程，难以描述下降流中大气泡体积分数突变为零的离散变化。
+本文模型为各尺寸配置独立动量方程，
+因而能同时较好预测电极附近上升流速度和下降流气泡高度。
+
+\begin{figure}[H]\centering
+\includegraphics[width=0.90\textwidth]{fig09_model_compare.png}
+\caption{三尺寸模型与伪单分散模型在 \(t=2.52~\mathrm{s}\) 时的液相及 X2
+体积分数（等值图）与速度场（矢量），以及用于测量 \(90~\mu\mathrm{m}\) 气泡速度的高速实验图像。}
+\label{fig:k_compare}
+\end{figure}
+
+\subsection{代表直径选择的影响}
+
+本文为简化模型而固定代表直径，并进一步考察 X1 和 X3 代表直径变化的影响。
+X1 在 \(10\) 至 \(50~\mu\mathrm{m}\) 间变化，X3 取 190、400 和 \(600~\mu\mathrm{m}\)。
+X1 代表直径对模拟流场影响很小：
+该等级质量分数较低，且所有工况下 Stokes 数都远小于 1，
+因此气泡速度几乎跟随液相速度。
+
+X3 直径的影响不可忽略，因为其质量分数较大且 Stokes 数约为 1。
+大气泡单位体积所受液相阻力较弱，上升速度更高；
+但直径超过 \(300~\mu\mathrm{m}\) 后，在总生成质量固定时气泡数减少，
+对液相的总向上驱动力反而降低。
+因此 X3 直径为 \(270~\mu\mathrm{m}\) 时整体下降流最强。
+
+伪单分散模型把实验值低估 82\%。
+即使 X3 代表直径取与实验分布相距很远的
+\(600~\mu\mathrm{m}\)，
+本文模型也只低估 33\%。
+代表直径确实影响预测，但不改变“考虑多个尺寸等级是有效的”这一结论。
+未来仍需研究尺寸分布样本量的充分性，以及电流密度分布引起的尺寸分布变化。
+
+\begin{figure}[H]\centering
+\includegraphics[width=0.94\textwidth]{fig10_diameter_effect.png}
+\caption{（a）质量比例分布中采用的代表直径；
+（b）改变 X1 直径时下降流 X2 平均速度；
+（c）改变 X3 直径时下降流 X2 平均速度。}
+\label{fig:k_diameter}
+\end{figure}
+
+\section{总结}
+
+更准确地预测气泡流动对于高性能水电解槽设计至关重要。
+分散气泡尺寸的处理会显著影响模拟流场。
+常用单分散模型往往给出不充分的预测，
+而将 PBM 等多分散模型用于含循环流电解槽的案例仍很少。
+
+本文提出一种新模型：按气泡直径把分散气相划分为多个尺寸等级，
+分别求解各等级的速度场和体积分数场。
+由于 Stokes 数不同，模型成功再现了各尺寸等级截然不同的流场，
+并在多个电流密度下通过实验验证。
+与 PBM 和单分散模型相比，本文模型能够同时改善上升流速度和下降流气泡高度的预测。
+未来工作包括：规范尺寸等级代表直径的选取方法、加入气泡聚并模型，
+并开发电极附近微观现象模型，以实现与电化学模型的耦合。
+
+\section*{作者贡献}
+Ryo Kanemoto：初稿撰写、验证、方法、研究、数据整理、概念设计；
+Takuto Araki：审阅与修改、监督、资源、经费获取、概念设计；
+Ryuta Misumi：资源；Shigenori Mitsushima：监督、经费获取。
+
+\section*{利益冲突声明}
+作者声明：Shigenori Mitsushima 报告其研究获得日本新能源产业技术综合开发机构的经费支持。
+其余作者不存在可能影响本文工作的已知竞争性经济利益或个人关系。
+
+\section*{致谢}
+本研究基于日本新能源产业技术综合开发机构（NEDO）委托的
+“氢技术与利用项目中先进水电解制氢基础技术开发”（JPNP20003）成果。
+感谢 Misumi 教授实验室的学生协助实验。
+
+\section*{补充材料与数据}
+补充材料见 \url{https://doi.org/10.1016/j.ces.2024.120986}。
+数据可根据请求提供。
+
+\section*{参考文献}
+\small
+参考文献的作者、题名、期刊和 DOI 按英文原文保留。以下列出正文主要引用：
+\begin{enumerate}[label={[\arabic*]},leftmargin=2.7em,itemsep=0.12em]
+\item A. Alexiadis et al., ``Liquid--gas flow patterns in a narrow electrochemical channel,'' \emph{Chemical Engineering Science} 66 (2011) 2252--2260.
+\item A. Angulo et al., ``Influence of bubbles on the energy conversion efficiency of electrochemical reactors,'' \emph{Joule} (2020).
+\item S. P. Antal, R. T. Lahey, J. E. Flaherty, \emph{International Journal of Multiphase Flow} 17 (1991) 635--652.
+\item M. M. Bakker, D. A. Vermaas, \emph{Electrochimica Acta} 319 (2019) 148--157.
+\item M. R. Bhole, J. B. Joshi, D. Ramkrishna, \emph{Chemical Engineering Science} 63 (2008) 2267--2282.
+\item P. Boissonneau, P. Byrne, \emph{Journal of Applied Electrochemistry} 30 (2000) 767--775.
+\item J. Brauns, T. Turek, ``Alkaline water electrolysis powered by renewable energy: a review,'' \emph{Processes} 8 (2020) 248.
+\item A. D. Burns et al., ``The Favre averaged drag model for turbulent dispersion in Eulerian multi-phase flows,'' ICMF (2004).
+\item A. Buttler, H. Spliethoff, \emph{Renewable and Sustainable Energy Reviews} 82 (2018) 2440--2454.
+\item W. Cai et al., \emph{International Journal of Hydrogen Energy} 84 (2024) 1004--1020.
+\item P. Chen, J. Sanyal, M. P. Dudukovic, \emph{Chemical Engineering Science} 59 (2004) 5201--5207.
+\item M. Dreoni et al., \emph{Journal of Physics: Conference Series} 2385 (2022) 012040.
+\item D. Drew, L. Cheng, R. T. Lahey, \emph{International Journal of Multiphase Flow} 5 (1979) 233--242.
+\item D. A. Drew, R. T. Lahey, \emph{International Journal of Multiphase Flow} 13 (1987) 113--121.
+\item S. S. Hossain et al., \emph{Physical Review E} 106 (2022) 035105.
+\item R. Hreiz et al., \emph{Chemical Engineering Science} 134 (2015) 138--152.
+\item H. Ikeda et al., \emph{International Journal of Hydrogen Energy} 47 (2022) 11116--11127.
+\item R. S. Jupudi et al., \emph{Journal of Computational Multiphase Flows} 1 (2009) 341--347.
+\item D. Le Bideau et al., \emph{Energies} 13 (2020) 3394.
+\item S. Lee et al., \emph{International Journal of Multiphase Flow} 31 (2005) 706--722.
+\item D. Li, Z. Li, Z. Gao, \emph{Chinese Journal of Chemical Engineering} 27 (2019).
+\item OpenFOAM Foundation, OpenFOAM v2006 documentation.
+\item L. Schiller, A. Naumann, ``A drag coefficient correlation,'' (1933).
+\end{enumerate}
+\normalsize
+
+\vfill
+\begin{center}\small\itshape
+翻译依据：Kanemoto 等，\emph{Chemical Engineering Science} 304 (2025) 120986。
+图内英文标注保留原貌。
+\end{center}
+\end{document}

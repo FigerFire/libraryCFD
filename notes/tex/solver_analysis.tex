@@ -1,0 +1,1349 @@
+% ============================================================================
+% 求解器算法与代码分析文档
+% OpenFOAM MHD-VoF Solver Collection
+% ============================================================================
+
+\documentclass[11pt,a4paper]{article}
+
+% ---------- 中文支持 ----------
+\usepackage[UTF8,fontset=fandol]{ctex}
+
+% ---------- 页面设置 ----------
+\usepackage[top=2.5cm, bottom=2.5cm, left=2.5cm, right=2.5cm]{geometry}
+\usepackage{setspace}
+\onehalfspacing
+
+% ---------- 数学公式 ----------
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{bm}
+
+% ---------- 图表 ----------
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{tabularx}
+\usepackage{enumitem}
+\newcolumntype{L}[1]{>{\raggedright\arraybackslash}p{#1}}
+\setlength{\emergencystretch}{3em}
+
+% ---------- 代码 ----------
+\usepackage{listings}
+\usepackage{xcolor}
+
+\definecolor{codegreen}{rgb}{0,0.6,0}
+\definecolor{codegray}{rgb}{0.5,0.5,0.5}
+\definecolor{codepurple}{rgb}{0.58,0,0.82}
+\definecolor{backcolour}{rgb}{0.95,0.95,0.92}
+
+\lstdefinestyle{cppstyle}{
+    backgroundcolor=\color{backcolour},
+    commentstyle=\color{codegreen},
+    keywordstyle=\color{magenta},
+    numberstyle=\tiny\color{codegray},
+    stringstyle=\color{codepurple},
+    basicstyle=\ttfamily\footnotesize,
+    breakatwhitespace=false,
+    breaklines=true,
+    captionpos=b,
+    keepspaces=true,
+    numbers=left,
+    numbersep=5pt,
+    showspaces=false,
+    showstringspaces=false,
+    showtabs=false,
+    tabsize=2,
+    language=C++
+}
+
+% ---------- 超链接 ----------
+\usepackage[
+    colorlinks=true,
+    linkcolor=blue!55!black,
+    citecolor=blue!55!black,
+    urlcolor=blue!55!black
+]{hyperref}
+
+% ---------- 定理环境 ----------
+\newtheorem{remark}{注记}[section]
+
+% ---------- 文档信息 ----------
+\title{\textbf{OpenFOAM MHD-VoF 求解器集合\\算法与代码结构分析}}
+\author{基于 OpenFOAM v1912 求解器源码分析}
+\date{源码审计版：2026年6月}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+本文档基于仓库源码而非仅依据求解器名称，对 OpenFOAM MHD--VoF
+求解器集合进行算法、数学公式、调用关系和使用方法审计。仓库面向电渣重熔
+（ESR）中的两相流、电磁力、焦耳热和共轭传热问题，组合了
+MULES/VoF-Library、isoAdvector、PIMPLE、EOF（OpenFOAM--Elmer）
+以及可变密度湍流模型。文档以完整 MHD--CHT--Iso--Cpad 修改版和
+随仓库提供的 ESR 算例为主线，同时说明 README 中列出的 17 个变体
+之间的差异。
+所有公式均区分“连续物理模型”“源码离散残差”和“需要进一步验证的实现假设”；
+仓库作者也明确声明这些求解器尚未完成数学验证或工程验证。
+\end{abstract}
+
+\tableofcontents
+\newpage
+
+% ============================================================================
+\section{引言}
+% ============================================================================
+
+\subsection{项目背景}
+
+本求解器集合面向电渣重熔（Electroslag Remelting, ESR）过程中多物理场耦合问题的数值模拟。ESR 过程涉及电磁场、温度场、流场和相界面的强耦合，具体物理现象包括：
+
+\begin{itemize}
+    \item 交流/直流电流通过渣池和金属熔池产生的焦耳热效应
+    \item 洛伦兹力驱动的磁流体动力学流动
+    \item 电极熔化、熔滴形成与滴落的多相流过程
+    \item 渣-金属两相界面的演变
+    \item 固体区域（结晶器壁、电极）的热传导
+    \item 流体-固体界面的共轭传热
+\end{itemize}
+
+\subsection{依赖项目}
+
+本求解器集合是在多个开源项目基础上组合开发而成：
+
+\begin{itemize}
+    \item \textbf{OpenFOAM} (openfoam.com v1912)：基础 CFD 求解框架
+    \item \textbf{Elmer FEM}：有限元多物理场求解器，用于求解电磁场方程
+    \item \textbf{EOF-Library}：OpenFOAM-Elmer 耦合接口库\cite{Vencels2019}
+    \item \textbf{VoFLibrary}：DLR 开发的 VOF 方法扩展库
+    \item \textbf{isoAdvector}：几何界面重构方法\cite{Roenby2016}
+    \item \textbf{varRhoTurbVOF}：变密度湍流 VOF 模型\cite{Fan2019}
+    \item \textbf{cpad}：连续相区域检测后处理库
+\end{itemize}
+
+\subsection{审计范围与阅读约定}
+
+本文采用以下证据优先级：
+\begin{enumerate}[label=\arabic*.]
+    \item 求解器主程序及其实际 \texttt{\#include} 调用链；
+    \item \texttt{Make/files}、\texttt{Make/options} 和算例字典；
+    \item 仓库 README 与上游论文；
+    \item 仅用于解释背景、但未在仓库中直接实现的连续方程。
+\end{enumerate}
+
+需要特别区分两条求解器族：
+\begin{itemize}
+    \item \textbf{单区域 \texttt{varRho} 族}是不可压、等温两相流，
+    使用显式密度加权湍流黏度；MHD 版本只接收洛伦兹力
+    \texttt{JxB}，不求解温度，也不接收焦耳热。
+    \item \textbf{多区域 \texttt{chtMultiRegion} 族}是可压、非等温两相流
+    与固体热传导耦合，使用以下可压两相输运模型：
+\begin{lstlisting}[style=cppstyle,numbers=none]
+compressibleInterPhaseTransportModel
+\end{lstlisting}
+    该族名称中没有 \texttt{varRho}，不能把两种湍流闭合混为一谈。
+\end{itemize}
+
+本仓库包含不少从 OpenFOAM v1912 和第三方项目复制后再组合的文件。
+因此这里所谓“继承关系”主要是源码复制、头文件复用和链接依赖关系，
+不一定是 C++ 类继承关系。
+
+\subsection{命名约定}
+
+求解器命名遵循以下约定：
+
+\begin{table}[H]
+\centering
+\caption{求解器命名前缀含义}
+\begin{tabularx}{\textwidth}{@{}L{0.27\textwidth}X@{}}
+\toprule
+\textbf{前缀/后缀} & \textbf{含义} \\
+\midrule
+\texttt{mhd} & 通过 EOF 库与 Elmer FEM 耦合，包含 MHD 效应 \\
+\texttt{varRho} & 采用变密度湍流模型（Fan \& Anglart, 2019） \\
+\texttt{interIso} / \texttt{interFlow} & 使用几何界面输运框架；具体方法由字典选择，算例选择 isoAdvector \\
+\texttt{Cpad} & 包含连续相区域检测用于后处理 \\
+\texttt{\_mod} & 修改版：电导率混合前限幅，并对低相分数单元施加相别截止 \\
+\texttt{chtMultiRegion} & 多区域共轭传热（流体区 + 固体区） \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+表中 MHD 只表示存在 EOF 电磁耦合。单区域 \texttt{mhdVarRho}
+实现只接收 \texttt{JxB}；多区域 MHD--CHT 实现同时接收
+\texttt{JxB} 和 \texttt{JH}。此外，README 的 17 项中只列出
+\texttt{compressibleInterFlowCpad}，但源码中也存在其无 Cpad 基础目录。
+
+% ============================================================================
+\section{求解器架构总览}
+% ============================================================================
+
+\subsection{求解器分类}
+
+根据 README 正式列出的名称，17 个求解器可分为以下层级：
+
+\begin{enumerate}
+    \item \textbf{可压、非等温两相基线}：
+    \texttt{compressibleInterFlowCpad}（仓库还保留未列入 17 个正式名称的
+    \texttt{compressibleInterFlow} 基础目录）。
+    \item \textbf{不可压、等温、可变密度湍流}：
+\begin{lstlisting}[style=cppstyle,numbers=none]
+varRhoInterFoam
+varRhoInterFoamCpad
+varRhoInterIsoFoam
+varRhoInterIsoFoamCpad
+\end{lstlisting}
+    \item \textbf{单区域 MHD--varRho}：
+\begin{lstlisting}[style=cppstyle,numbers=none]
+mhdVarRhoInterFoam
+mhdVarRhoInterFoamCpad
+mhdVarRhoInterIsoFoam
+mhdVarRhoInterIsoFoamCpad
+mhdVarRhoInterIsoFoamCpad_mod
+\end{lstlisting}
+    \item \textbf{多区域共轭传热}：
+    \texttt{chtMultiRegionInterFoam}、\texttt{chtMultiRegionInterIsoFoam}。
+    \item \textbf{MHD--CHT 完整耦合}：
+\begin{lstlisting}[style=cppstyle,numbers=none]
+mhdChtMultiRegionInterFoam
+mhdChtMultiRegionInterFoamCpad
+mhdChtMultiRegionInterIsoFoam
+mhdChtMultiRegionInterIsoFoamCpad
+mhdChtMultiRegionInterIsoFoamCpad_mod
+\end{lstlisting}
+\end{enumerate}
+
+\subsection{目录结构}
+
+\begin{lstlisting}[style=cppstyle, caption={项目顶层目录结构}]
+.
+|-- solver/                         # solver sources
+|   |-- chtMultiRegionFoam/
+|   |   |-- fluid/                  # fluid equations
+|   |   |-- solid/                  # solid equations
+|   |   |-- include/                # time-step helpers
+|   |   |-- mhdChtMultiRegion*/
+|   |   `-- chtMultiRegion*/
+|   |-- compressibleInterFlow/
+|   `-- mhdVarRho*/
+|-- libs/
+|   |-- eof/                        # OpenFOAM-Elmer coupling
+|   |-- VoF/                        # v1912 VOF headers
+|   |-- VoF_Library/                # geometric VOF library
+|   |-- cpad/                       # README only in this snapshot
+|   |-- varRhoIncompressible/
+|   `-- commSplit_modifed_1912/
+`-- examples/
+\end{lstlisting}
+
+\begin{remark}
+多个 Cpad 求解器的 \texttt{Make/options} 实际引用
+\path{libs/of-cpad-library/src/lnInclude} 并链接 \texttt{-lcpad}，
+但本仓库快照中只有 \texttt{libs/cpad/README.md}，没有对应源码和
+\texttt{Make} 文件。因此 Cpad 变体不能仅靠当前仓库独立编译；
+必须另行取得 of-cpad-library，并保持目录名与 \texttt{Make/options}
+一致，或修改这些路径。
+\end{remark}
+
+% ============================================================================
+\section{控制方程}
+% ============================================================================
+
+本节以最完整的求解器 \texttt{mhdChtMultiRegionInterIsoFoamCpad\_mod} 为参照，
+描述所有物理模型的控制方程。
+
+\subsection{相分数方程（VOF 方法）}
+
+连续层面以 $\alpha_1$ 表示第一相体积分数。无相变、共享速度场时，
+基本输运方程可写为
+\begin{equation}
+\frac{\partial \alpha_1}{\partial t}
++\nabla\cdot(\alpha_1\mathbf{U})
+=\alpha_1\nabla\cdot\mathbf{U}+S_\alpha .
+\label{eq:alphaEqn}
+\end{equation}
+右端源项在代码中由 \texttt{dgdt} 构造为线性化的
+\texttt{Sp}/\texttt{Su}。完整 CHT--Iso 路径实际调用
+\begin{lstlisting}[style=cppstyle]
+#include "alphaSuSp.H"
+advector->advect(Sp, (Su + divU*min(alpha1(), scalar(1)))());
+rhoPhi = advector->getRhoPhi(rho1, rho2);
+alphaPhi10 = advector->alphaPhi();
+\end{lstlisting}
+因此几何界面通量由运行时选择的 \texttt{advectionSchemes} 对象生成，
+而不是把人工压缩项直接离散进这个头文件。算例在
+\texttt{system/mixture/fvSolution} 中选择
+\texttt{advectionScheme isoAdvector} 和
+\texttt{reconstructionSchemes plicRDF}。
+
+两相满足约束条件：
+\begin{equation}
+\alpha_1 + \alpha_2 = 1
+\end{equation}
+
+混合物的热物性采用体积加权：
+\begin{equation}
+\rho = \alpha_1 \rho_1 + \alpha_2 \rho_2
+\end{equation}
+
+\subsection{MULES 人工压缩与几何输运的区别}
+
+\texttt{interFoam} 路径的 MULES 方程包含常见压缩通量
+\begin{equation}
+\nabla\cdot\left[
+\alpha_1(1-\alpha_1)\mathbf{U}_c
+\right],
+\qquad
+\mathbf{U}_c \parallel \mathbf{n}_\alpha ,
+\end{equation}
+代码通过 \texttt{cAlpha}、\texttt{icAlpha} 和 \texttt{scAlpha}
+构造面压缩通量 \texttt{phic}，再由 MULES 保证有界性。
+而本文主线的 \texttt{InterIso/InterFlow} 路径使用几何重构与几何面通量。
+\texttt{fvSolution} 中仍可看到 \texttt{cAlpha} 等兼容项，但真正采用何种
+输运算法由 \texttt{advectionScheme} 决定，不能只根据字段名判断。
+
+\subsection{质量守恒方程}
+
+多区域可压路径采用
+
+\begin{equation}
+\frac{\partial \rho}{\partial t} + \nabla \cdot (\rho \mathbf{U}) = 0
+\label{eq:continuity}
+\end{equation}
+
+在求解器实现中，连续方程通过相分数通量和压力方程共同满足。
+\texttt{contErr.H} 的实际定义还扣除了两个相上的 \texttt{fvOptions}
+质量源：
+
+\begin{equation}
+\mathrm{contErr} =
+\frac{\partial \rho}{\partial t}
++\nabla\cdot\boldsymbol{\phi}_\rho
+-S_{\rho,1}-S_{\rho,2}.
+\end{equation}
+
+单区域 \texttt{varRho} 路径则假定两相各自不可压，使用
+$\nabla\cdot\mathbf{U}=0$ 和
+$\rho=\alpha_1\rho_1+(1-\alpha_1)\rho_2$；
+其“varRho”是湍流模型显式使用局部混合密度，并不是热力学可压缩。
+
+\subsection{动量方程（含 MHD 洛伦兹力）}
+
+忽略离散修正项后，主线求解器的动量方程可概括为
+
+\begin{equation}
+\frac{\partial (\rho \mathbf{U})}{\partial t}
++\nabla \cdot (\rho \mathbf{U} \otimes \mathbf{U})
+-\mathrm{contErr}\,\mathbf{U}
+=-\nabla p_{\text{rgh}}
+-gh\nabla \rho
++\nabla \cdot \bm{\tau}
++\mathbf{f}_\sigma
++\overline{\mathbf{J}\times\mathbf{B}}
++\mathbf{S}_U .
+\label{eq:UEqn}
+\end{equation}
+
+其中各项含义：
+\begin{itemize}
+    \item $p_{\text{rgh}} = p - \rho \mathbf{g} \cdot \mathbf{x}$：减去静水压力的动压力
+    \item $\bm{\tau} = \mu_{\text{eff}} \left[\nabla \mathbf{U} + (\nabla \mathbf{U})^T - \frac{2}{3}(\nabla \cdot \mathbf{U})\mathbf{I}\right]$：有效黏性应力张量
+    \item $\mathbf{f}_\sigma$：表面张力（CSF 模型）
+    \item $\mathbf{J} \times \mathbf{B}$：洛伦兹力（MHD 耦合项，由 Elmer FEM 提供）
+    \item $\mathbf{S}_U$：其他动量源项（如 Darcy 阻尼、MRF 等）
+\end{itemize}
+
+在代码中，动量方程的离散形式为（参见 \texttt{mhdUEqn.H}）：
+
+\begin{lstlisting}[style=cppstyle]
+fvVectorMatrix UEqn
+(
+    fvm::ddt(rho, U) + fvm::div(rhoPhi, U)
+  - fvm::Sp(contErr, U)
+  + MRF.DDt(rho, U)
+  + turbulence.divDevRhoReff(U)
+ ==
+    fvOptions(rho, U)
+    + JxB    // MHD Lorentz force source term
+);
+\end{lstlisting}
+
+其中 \texttt{JxB} 的 OpenFOAM 维度为
+\[
+\texttt{[1 -2 -2 0 0 0 0]},
+\]
+即 $\mathrm{N/m^3}$。
+\path{setRegionMhdFluidFields.H} 直接执行
+\texttt{JxB.field() = JxB\_recv.field()}，当前实现没有再乘
+$\alpha_1$；因此 Elmer 侧映射范围和单位必须已经正确。
+
+\subsection{能量方程}
+
+\subsubsection{流体区温度方程}
+
+该求解器没有调用标准 \texttt{EEqn.H}，而是使用自定义
+\texttt{mhdTEqn.H}。令
+\[
+\chi_{Cv}=\frac{\alpha_1}{C_{v,1}}+
+\frac{\alpha_2}{C_{v,2}},\qquad
+K=\frac{1}{2}|\mathbf{U}|^2 ,
+\]
+则源码离散残差对应
+\begin{equation}
+\begin{aligned}
+\mathcal{R}_T={}&
+\frac{\partial(\rho T)}{\partial t}
++\nabla\cdot(\boldsymbol{\phi}_\rho T)
+-\mathrm{contErr}\,T
+-\nabla\cdot(\alpha_{\mathrm{eff}}\nabla T)\\
+&+\chi_{Cv}\left[
+p\nabla\cdot\mathbf{U}
+-\frac{p}{\rho}\mathrm{contErr}
++\frac{\partial(\rho K)}{\partial t}
++\nabla\cdot(\boldsymbol{\phi}_\rho K)
+-\mathrm{contErr}\,K
++J_H
+\right]
+=S_T .
+\end{aligned}
+\label{eq:TEqn}
+\end{equation}
+
+其中：
+\begin{itemize}
+    \item $K = \frac{1}{2}|\mathbf{U}|^2$：动能
+    \item $\alpha_{\text{eff}}$：有效热扩散系数（含湍流贡献）
+    \item $J_H$：Elmer 返回的焦耳热字段，OpenFOAM 维度为 $\mathrm{W/m^3}$
+    \item $C_{v,1}$、$C_{v,2}$：两相的定容比热容
+    \item $S_T$：辐射等其他源项
+\end{itemize}
+
+关键源码为：
+
+\begin{lstlisting}[style=cppstyle]
+fvScalarMatrix TEqn
+(
+    fvm::ddt(rho, T) + fvm::div(rhoPhi, T) - fvm::Sp(contErr, T)
+  - fvm::laplacian(turbulence.alphaEff(), T)
+  + (
+        (divU*p)() - contErr/rho*p
+      + (fvc::ddt(rho, K) + fvc::div(rhoPhi, K))() - contErr*K
+      + JH
+    )
+   *(
+       alpha1()/mixture.thermo1().Cv()()
+     + alpha2()/mixture.thermo2().Cv()()
+    )
+ ==
+    fvOptions(rho, T)
+);
+\end{lstlisting}
+
+\begin{remark}
+这里存在必须在生产计算前核对的符号问题：\texttt{JH} 以正号加入
+矩阵左侧括号，而固体方程用 \texttt{-JH} 放在左侧。按通常
+\texttt{fvMatrix} 记号，将流体式移到显式右端后，正的 \texttt{JH}
+表现为温度汇；与此同时 \texttt{setRegionMhdFluidFields.H} 又把负的
+\texttt{JH} 截为零。这与“焦耳热为正热源”的物理预期不一致。
+本文按源码原样记录，不把该项擅自改写成已验证的正热源。
+\end{remark}
+
+\subsubsection{固体区能量方程}
+
+固体区域求解焓形式热传导方程（参见 \texttt{solveMhdSolid.H}）：
+
+\begin{equation}
+\frac{\partial (\beta_v\rho h)}{\partial t}
+=\nabla\cdot(\beta_v\alpha_h\nabla h)+J_H+S_h .
+\label{eq:solidEnergy}
+\end{equation}
+
+其中 $h$ 为热力学模型返回的比焓，$\beta_v$ 为可选体积分数
+（缺省为 1），$\alpha_h=\kappa/C_p$；各向异性材料使用张量形式。
+源码中的 \texttt{-JH} 位于左侧，因此移项后是正热源。
+
+\subsection{压力方程（PIMPLE 算法）}
+
+压力方程通过动量预测通量与两相可压缩性修正构造。采用
+$p_{\text{rgh}}=p-\rho gh$ 作为求解变量，源码算子形式为
+
+\begin{equation}
+\sum_{i=1}^{2}
+\frac{\max(\alpha_i,0)}{\rho_i}\,
+\mathcal{C}_i(p_{\text{rgh}})
++\nabla\cdot\boldsymbol{\phi}_{H/A}
+-\nabla\cdot\left(r_{AU,f}\nabla p_{\text{rgh}}\right)=0 .
+\label{eq:pEqn}
+\end{equation}
+
+其中 $r_{AU}=1/A_U$，$\boldsymbol{\phi}_{H/A}$ 包含动量预测通量、
+时间修正、MRF、重力和表面张力，$\mathcal{C}_i$ 包含第 $i$ 相的
+$\partial\rho_i/\partial t$、$\psi_i\partial p_{\text{rgh}}/\partial t$
+及对流修正。非正交循环结束后更新
+\[
+\boldsymbol{\phi}=\boldsymbol{\phi}_{H/A}+\boldsymbol{\phi}_p,\qquad
+\mathbf{U}=\mathbf{H}/A_U+r_{AU}\operatorname{reconstruct}(\cdots),
+\]
+随后按热力学压缩率修正 $\rho_i$，并执行
+$p=\max(p_{\text{rgh}}+\rho gh,p_{\min})$。
+
+\subsection{湍流模型}
+
+\subsubsection{CHT 路径的可压缩两相湍流}
+
+完整 CHT 求解器构造
+\path{compressibleInterPhaseTransportModel}，并由
+\path{constant/mixture/turbulenceProperties} 选择 RAS、LES 或
+laminar。示例选择 \texttt{RNGkEpsilon}。其有效动力黏度可概括为
+\begin{equation}
+\mu_{\text{eff}} = \mu + \mu_t
+\end{equation}
+
+\subsubsection{单区域 varRho 路径}
+
+根据 Fan \& Anglart (2019)\cite{Fan2019} 的工作，变密度湍流模型显式引用密度场以考虑等温变密度效应。关键修改：
+
+\begin{equation}
+\mu = \rho \nu, \quad \mu_t = \rho \nu_t, \quad \mu_{\text{eff}} = \rho(\nu + \nu_t)
+\end{equation}
+
+这使得湍流黏度直接与局部混合密度耦合，适用于不可压、等温但
+混合密度随相分数变化的两相流。该实现不在
+\texttt{mhdChtMultiRegionInterIsoFoamCpad\_mod} 的调用链中。
+
+在代码中（\texttt{varRhoIncompressibleTurbulenceModel.C}）：
+
+\begin{lstlisting}[style=cppstyle]
+Foam::tmp<Foam::volScalarField>
+Foam::varRhoIncompressibleTurbulenceModel::mu() const
+{
+    return rho_*nu();    // Dynamic viscosity = density * kinematic viscosity
+}
+
+Foam::tmp<Foam::volScalarField>
+Foam::varRhoIncompressibleTurbulenceModel::mut() const
+{
+    return rho_*nut();   // Turbulent viscosity = density * turbulent nu
+}
+\end{lstlisting}
+
+\subsection{电磁场方程（Elmer FEM 端）}
+
+仓库本身不离散 Maxwell 方程；它通过 EOF 把电导率发送给 Elmer。
+随附算例的 \texttt{case\_eof\_harm.sif} 选择
+\texttt{WhitneyAVHarmonicSolver}，频率为 $50\,\mathrm{Hz}$。用相量
+$\widehat{\mathbf A}$、$\widehat V$ 表示时，常用涡流 $A$--$V$
+形式可写成
+
+\begin{equation}
+\nabla\times\left(\mu^{-1}\nabla\times\widehat{\mathbf A}\right)
++i\omega\sigma\widehat{\mathbf A}
++\sigma\nabla\widehat V
+=\widehat{\mathbf J}_{\mathrm{ext}},
+\label{eq:magnetic}
+\end{equation}
+
+\begin{equation}
+\nabla\cdot\left[
+\sigma\left(-i\omega\widehat{\mathbf A}-\nabla\widehat V\right)
+\right]=0 .
+\label{eq:electric}
+\end{equation}
+
+具体规范、边界条件和复数符号约定由 Elmer 实现决定。由
+$\widehat{\mathbf B}=\nabla\times\widehat{\mathbf A}$、
+$\widehat{\mathbf J}=\sigma\widehat{\mathbf E}$ 可计算周期平均量
+
+\begin{equation}
+\overline{\mathbf f_L}
+=\frac{1}{2}\operatorname{Re}
+\left(\widehat{\mathbf J}\times\widehat{\mathbf B}^{*}\right),
+\end{equation}
+
+\begin{equation}
+\overline{q_J}
+=\frac{1}{2}\operatorname{Re}
+\left(\widehat{\mathbf J}\cdot\widehat{\mathbf E}^{*}\right).
+\end{equation}
+
+电导率 $\sigma$ 在 VOF 框架下为两相混合值：
+\begin{equation}
+\sigma = \alpha_1 \sigma_1 + (1 - \alpha_1) \sigma_2
+\end{equation}
+
+CHT 的 \texttt{\_mod} 版本先限幅，再执行额外截止：
+
+\begin{lstlisting}[style=cppstyle]
+// 原始版本
+elcond = alpha1 * elCondListByPhase[0] + (1 - alpha1) * elCondListByPhase[1];
+
+// _mod 版本：增加相分数截断
+alpha1f = min(max(alpha1, scalar(0)), scalar(1));
+elcond = alpha1f * elcond1 + (1 - alpha1f) * elcond2;
+if (alpha1[celli] < 0.1)
+{
+    elcond[celli] = elcond2.value();
+}
+\end{lstlisting}
+
+这等价于
+\begin{equation}
+\sigma(\alpha_1)=
+\begin{cases}
+\sigma_2, & \alpha_1<0.1,\\
+\bar\alpha_1\sigma_1+(1-\bar\alpha_1)\sigma_2,
+& \alpha_1\ge 0.1,
+\end{cases}
+\quad
+\bar\alpha_1=\min(1,\max(0,\alpha_1)).
+\end{equation}
+单区域 \texttt{mhdVarRhoInterIsoFoamCpad\_mod} 使用的截止值则是
+$0.5$，两个 \texttt{\_mod} 实现并不相同。
+
+% ============================================================================
+\section{数值算法}
+% ============================================================================
+
+\subsection{PIMPLE 算法流程}
+
+求解器采用 PIMPLE（PISO-SIMPLE 混合）算法处理压力-速度耦合。对于多区域求解器，采用外层 PIMPLE 循环和内层 PISO 循环的嵌套结构。
+
+\begin{figure}[H]
+\centering
+\caption{单时间步内 PIMPLE 算法流程图（完整 MHD-CHT 求解器）}
+\begin{minipage}{0.95\textwidth}
+\begin{enumerate}
+    \item 启动阶段创建所有区域和场，向 Elmer 发送初始电导率，
+    并阻塞接收初始 \texttt{JxB\_recv}/\texttt{JH\_recv}。
+    \item 每个时间步先读取控制字典，计算流体 Courant 数、界面
+    Courant 数和固体扩散数，再调整 $\Delta t$。
+    \item 进入外层 PIMPLE 循环。第一次外迭代调用
+    \texttt{advector->surf().reconstruct()}。
+    \item 对每个流体区调用 \texttt{solveMhdFluid.H}：
+    相分数输运 $\rightarrow$ 相通量修正 $\rightarrow$ 动量方程
+    $\rightarrow$ 温度方程 $\rightarrow$ 压力校正
+    $\rightarrow$ 湍流修正。
+    \item 对每个固体区调用 \texttt{solveMhdSolid.H}，求解含
+    \texttt{JH} 的焓方程。
+    \item 第一次外迭代后可进入 \texttt{energyCoupling} 循环；
+    流体区把 \texttt{frozenFlow} 设为真，只重复温度方程，
+    固体区重复焓方程。
+    \item \textbf{PIMPLE 全部结束以后}才比较
+    $\max|\alpha_1-\alpha_{1,\mathrm{old}}|$。达到阈值时发送新电导率，
+    接收下一次使用的 \texttt{JxB}/\texttt{JH}。
+    \item 写出 OpenFOAM 时间步；Cpad 版本随后生成连续相报告。
+\end{enumerate}
+\end{minipage}
+\end{figure}
+
+\begin{remark}
+因此流体和固体方程使用的是“最近一次成功 Elmer 更新”的电磁场，
+不是当前 PIMPLE 外迭代中即时重算的场。该分区顺序属于显式/滞后耦合；
+\texttt{energyCoupling} 循环也不会触发新的电磁求解。
+\end{remark}
+
+\subsection{界面捕捉方法}
+
+\subsubsection{VOF 标准方法（MULES）}
+
+标准 VOF 求解器（\texttt{interFoam} 族）使用 MULES（Multidimensional Universal Limiter for Explicit Solution）方法保证相分数的有界性和守恒性：
+
+\begin{itemize}
+    \item 显式时间推进
+    \item 通量限制器保证 $\alpha \in [0, 1]$
+    \item 支持子循环以放宽 Courant 数限制
+\end{itemize}
+
+\subsubsection{isoAdvector 方法}
+
+\texttt{InterIso/InterFlow} 路径通过 VoF-Library 的运行时选择机制
+装配几何输运；本算例明确选择 isoAdvector\cite{Roenby2016}。
+其基本步骤为：
+
+\begin{enumerate}
+    \item \textbf{界面重构}：在每个包含界面的网格单元内，通过 $\alpha$ 值和梯度信息重构界面等值面
+    \item \textbf{通量计算}：基于重构的等值面，计算通过每个面的精确几何通量
+    \item \textbf{时间积分}：沿时间方向精确积分通量
+\end{enumerate}
+
+在代码中（\texttt{alphaEqn.H}）：
+
+\begin{lstlisting}[style=cppstyle]
+// isoAdvector 相输运
+#include "alphaSuSp.H"
+advector->advect(Sp, (Su + divU*min(alpha1(), scalar(1)))());
+
+// 更新密度通量
+rhoPhi = advector->getRhoPhi(rho1, rho2);
+alphaPhi10 = advector->alphaPhi();
+\end{lstlisting}
+
+\subsubsection{子循环策略}
+
+为满足界面 Courant 数限制（通常 $Co_\alpha < 0.5$），相分数方程可在每个时间步内进行 $N$ 个子循环：
+
+\begin{equation}
+\Delta t_{\text{sub}} = \frac{\Delta t}{N_{\text{sub}}}
+\end{equation}
+
+每次子循环求解一次相方程，最终通量为各子循环通量之和：
+
+\begin{equation}
+\phi_{\rho, \text{total}} = \sum_{k=1}^{N_{\text{sub}}} \frac{\Delta t_{\text{sub}}}{\Delta t} \phi_{\rho}^{(k)}
+\end{equation}
+
+\subsection{OpenFOAM-Elmer 耦合机制}
+
+\subsubsection{EOF 库架构}
+
+EOF（Elmer-OpenFOAM coupler for electromagnetics and fluid dynamics）库\cite{Vencels2019} 实现了基于 MPI 的 OpenFOAM 与 Elmer FEM 的耦合。耦合架构如下：
+
+\begin{itemize}
+    \item \textbf{通信方式}：OpenFOAM 与 Elmer 以 MPMD 方式在同一个
+    \texttt{mpirun} 中启动，EOF 在共享 MPI 作业中建立通信关系
+    \item \textbf{网格映射}：OpenFOAM 有限体积网格
+    $\leftrightarrow$ Elmer 有限元网格之间的数据插值
+    \item \textbf{重叠检测}：通过包围盒（bounding box）比较确定各 MPI 分区间的网格重叠关系
+    \item \textbf{数据插值}：在重叠区域进行单元中心数据的插值传输
+\end{itemize}
+
+\subsubsection{耦合变量}
+
+\begin{table}[H]
+\centering
+\caption{OpenFOAM-Elmer 耦合变量交换}
+\begin{tabular}{@{}lll@{}}
+\toprule
+\textbf{方向} & \textbf{物理量} & \textbf{变量名} \\
+\midrule
+OF $\rightarrow$ Elmer & 电导率 & \texttt{elcond} \\
+Elmer $\rightarrow$ OF & 洛伦兹力（矢量） & \texttt{JxB\_recv} $\rightarrow$ \texttt{JxB} \\
+Elmer $\rightarrow$ OF & 焦耳热（标量） & \texttt{JH\_recv} $\rightarrow$ \texttt{JH} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsubsection{耦合策略}
+
+所有 MHD 主程序都采用相分数变化触发策略。变量名
+\texttt{maxRelDiff} 容易误导：代码计算的是最大绝对差，不是相对差：
+
+\begin{lstlisting}[style=cppstyle]
+scalar maxRelDiff_local = (max(mag(alpha1_old - alpha1))).value();
+
+if (maxRelDiff_local > maxRelDiff && (maxRelDiff < SMALL || maxRelDiff+SMALL <= 1.0))
+{
+    updateElmerSolution = true;
+}
+
+if (updateElmerSolution || !runTime.run())
+{
+    alpha1_old = alpha1;
+    // 发送电导率，接收洛伦兹力和焦耳热
+    sending.sendScalar(elcond);
+    receiving.recvVector(JxB_recv);
+    receiving.recvScalar(JH_recv);
+}
+\end{lstlisting}
+
+启动时总会交换一次。时间循环内，只有绝对变化超过阈值或程序准备
+结束时才继续 Elmer。注释给出的语义是：$1$ 近似只算一次，
+$0<\varepsilon<1$ 按阈值更新，$0$ 尽可能频繁更新；严格来说，
+当变化恰为零时阈值 0 也不会触发。
+
+\subsubsection{Elmer 端多区域修改}
+
+为支持多区域耦合，对 EOF 库的 Elmer 端进行了以下修改（\texttt{elmer\_mr\_solver/}）：
+\begin{itemize}
+    \item 增加了 \texttt{Bodies} 关键字，支持将不同物理体的场变量分别发送到不同的 OpenFOAM 区域
+    \item 修改了 \texttt{Elmer2OpenFOAM.F90} 和 \texttt{OpenFOAM2Elmer.F90} 中数组索引，以支持多体-多区域映射
+\end{itemize}
+
+\subsection{多区域共轭传热}
+
+多区域求解器管理多个流体区域（\texttt{fluidRegions}）和固体区域（\texttt{solidRegions}），通过以下机制实现共轭传热：
+
+\begin{itemize}
+    \item 流体-固体界面温度场和热通量通过 OpenFOAM 的可压缩
+    ``coupled baffle mixed temperature'' 边界条件耦合
+    \item 独立的时间步控制（流体 Courant 数 + 固体扩散数）
+    \item 区域间能量耦合迭代（\texttt{energyCoupling} 循环）
+\end{itemize}
+
+理想连续条件为
+\begin{equation}
+T_f=T_s,\qquad
+-\mathbf n_f\cdot k_f\nabla T_f
+=\mathbf n_s\cdot k_s\nabla T_s .
+\end{equation}
+算例在 \texttt{changeDictionaryDict} 中把
+\texttt{mixture\_to\_*}、\texttt{skin\_to\_*} 和
+\texttt{mould\_to\_*} 设置为以下类型：
+\begin{lstlisting}[style=cppstyle,numbers=none]
+compressible::turbulentTemperatureCoupledBaffleMixed
+\end{lstlisting}
+由边界条件迭代满足温度/热流耦合。
+
+能量耦合循环的代码逻辑（\texttt{mhdChtMultiRegionInterIsoFoamCpad\_mod.C}）：
+
+\begin{lstlisting}[style=cppstyle]
+// 能量耦合子循环
+if (!oCorr && nOuterCorr > 1)
+{
+    loopControl looping(runTime, pimple, "energyCoupling");
+    while (looping.loop())
+    {
+        forAll(fluidRegions, i)
+        {
+            frozenFlow = true;  // 冻结流动，仅求解能量
+            #include "solveMhdFluid.H"
+        }
+        forAll(solidRegions, i)
+        {
+            #include "solveMhdSolid.H"
+        }
+    }
+}
+\end{lstlisting}
+
+\subsection{时间步控制}
+
+\begin{itemize}
+    \item 流体 Courant 数 $Co$：由所有流体区取最大值；
+    \item 界面 Courant 数 $Co_\alpha$：只在界面附近统计并打印；
+    \item 固体扩散数 $Di$：由所有固体区取最大值。
+\end{itemize}
+
+\texttt{setMultiRegionDeltaT.H} 的实际缩放因子为
+\begin{equation}
+r_f=\min\left(
+\min\left(\frac{Co_{\max}}{Co},1+0.1\frac{Co_{\max}}{Co}\right),
+1.2\right),
+\end{equation}
+\begin{equation}
+\Delta t_{\mathrm{new}}
+=\min\left[
+\min\left(r_f,\frac{Di_{\max}}{Di}\right)\Delta t,
+\Delta t_{\max}
+\right].
+\end{equation}
+
+\begin{remark}
+虽然主程序读取并打印 \texttt{maxAlphaCo} 和 $Co_\alpha$，
+当前 \texttt{setMultiRegionDeltaT.H} 并没有使用它们。
+因此示例中的 \texttt{maxAlphaCo 0.9} 不会直接限制全局时间步；
+界面稳定性主要依赖固定的 \texttt{nAlphaSubCycles} 和用户自行选择的
+\texttt{maxCo}/\texttt{maxDeltaT}。这是文档和算例参数容易产生误解的地方。
+\end{remark}
+
+% ============================================================================
+\section{关键代码结构分析}
+% ============================================================================
+
+\subsection{求解器入口（以完整 MHD-CHT 求解器为例）}
+
+\begin{lstlisting}[style=cppstyle, caption={mhdChtMultiRegionInterIsoFoamCpad\_mod.C 主程序结构}]
+int main(int argc, char *argv[])
+{
+    #include "createTime.H"
+    #include "createMeshes.H"
+    #include "createFields.H"
+    #include "createMhdFields.H" // includes initial EOF send/receive
+
+    while (runTime.run())
+    {
+        #include "readPIMPLEControls.H"
+        #include "compressibleMultiRegionCourantNo.H"
+        #include "alphaMultiRegionCourantNo.H"
+        #include "solidRegionDiffusionNo.H"
+        #include "setMultiRegionDeltaT.H"
+
+        ++runTime;
+
+        for (int oCorr=0; oCorr<nOuterCorr; ++oCorr)
+        {
+            if (firstIter)
+                advector->surf().reconstruct();
+
+            forAll(fluidRegions, i)
+                #include "solveMhdFluid.H"
+
+            forAll(solidRegions, i)
+                #include "solveMhdSolid.H"
+
+            if (!oCorr && nOuterCorr > 1) { ... }
+        }
+
+        // Update rho/p, then conditionally exchange fields with Elmer
+        forAll(fluidRegions, i) { ... send/receive ... }
+        forAll(solidRegions, i) { ... receive JH ... }
+
+        runTime.write();
+        // Cpad report follows runTime.write()
+    }
+}
+\end{lstlisting}
+
+\subsection{流体区求解流程（solveMhdFluid.H）}
+
+\begin{lstlisting}[style=cppstyle, caption={solveMhdFluid.H 流体区求解流程}]
+if (finalIter)
+    mesh.data::add("finalIteration", true);
+
+if (frozenFlow)
+{
+    // 冻结流动模式：仅求解温度方程（用于能量耦合迭代）
+    #include "mhdTEqn.H"
+}
+else
+{
+    // 正常求解模式
+    // Step 1: 求解相分数方程（含子循环）
+    #include "compressibleAlphaEqnSubCycle.H"
+    
+    // Step 2: 湍流相通量修正
+    turbulence.correctPhasePhi();
+    
+    // Step 3: 求解动量方程（含 JxB 洛伦兹力源项）
+    #include "mhdUEqn.H"
+    
+    // Step 4: 求解温度方程（含 JH 焦耳热源项）
+    #include "mhdTEqn.H"
+    
+    // Step 5: PISO 压力校正循环
+    for (int corr=0; corr<nCorr; corr++)
+        #include "pEqn.H"
+    
+    // Step 6: 湍流模型修正
+    turbulence.correct();
+}
+\end{lstlisting}
+
+\subsection{MHD 耦合数据流}
+
+图 \ref{fig:mhd_flow} 展示了 MHD 耦合的完整数据流。
+
+\begin{figure}[H]
+\centering
+\begin{tabularx}{0.96\textwidth}{L{0.40\textwidth}cL{0.40\textwidth}}
+\toprule
+\textbf{OpenFOAM（有限体积）} & & \textbf{Elmer（有限元）}\\
+\midrule
+由 $\alpha_1,\sigma_1,\sigma_2$ 构造 \texttt{elcond}
+& $\longrightarrow$ & 接收并映射电导率 $\sigma(\mathbf{x})$\\
+保持 CFD 场不变并等待 &
+& 求解谐波电磁问题，计算 $\overline{\mathbf J\times\mathbf B}$
+与 $\overline{q_J}$\\
+接收 \texttt{JxB\_recv} 和 \texttt{JH\_recv}
+& $\longleftarrow$ & 按 \texttt{Bodies}/目标变量映射并发送\\
+下一时间步把 \texttt{JxB} 加入动量方程，
+\texttt{JH} 加入流体/固体能量方程 &
+& 等待下一次 \texttt{sendStatus}/\texttt{elcond}\\
+\bottomrule
+\end{tabularx}
+\caption{MHD 耦合数据流与时间滞后}
+\label{fig:mhd_flow}
+\end{figure}
+
+\subsection{相分数更新触发机制}
+
+MHD 耦合求解器中的一个关键优化是仅当相分数变化足够大时才触发 Elmer 求解：
+
+\begin{lstlisting}[style=cppstyle]
+// sendUpdateRegionMhdFluidFields.H
+scalar maxRelDiff_local = (max(mag(alpha1_old - alpha1))).value();
+
+if (maxRelDiff_local > maxRelDiff 
+    && (maxRelDiff < SMALL || maxRelDiff + SMALL <= 1.0))
+{
+    updateElmerSolution = true;
+}
+
+if (updateElmerSolution || !runTime.run())
+{
+    alpha1_old = alpha1;
+    // 仅此时触发 Elmer 求解和数据交换
+    sending.sendStatus(runTime.run());
+    sending.sendScalar(elcond);
+    receiving.sendStatus(runTime.run());
+    receiving.recvVector(JxB_recv);
+    receiving.recvScalar(JH_recv);
+}
+\end{lstlisting}
+
+\subsection{CPAD 后处理}
+
+CPAD（Continuous Phase Area Detection）库在每次时间步结束时调用，用于识别和标记连续相区域，便于后处理分析（如识别孤立液滴、统计相分布等）：
+
+\begin{lstlisting}[style=cppstyle]
+// CPAD 后处理（mhdVarRhoInterIsoFoamCpad_mod.C）
+#include "getLocalToGlobalFaceArray.h"
+FoamCpad::cpad cpas(mixture, runTime);
+cpas.appendTimeStepReport(runTime.value(), procFaceToGlobalFaceList);
+\end{lstlisting}
+
+% ============================================================================
+\section{求解器变体对比}
+% ============================================================================
+
+\subsection{命名与特性矩阵}
+
+表 \ref{tab:solver-matrix} 汇总了 README 列出的 17 个正式变体。
+源码中还保留以下未列入清单的无 Cpad 基础目录，表中一并列出：
+\begin{lstlisting}[style=cppstyle,numbers=none]
+compressibleInterFlow
+\end{lstlisting}
+
+\begin{table}[H]
+\centering
+\caption{求解器特性矩阵}
+\label{tab:solver-matrix}
+\scriptsize
+\begin{tabular}{@{}lcccccc@{}}
+\toprule
+\textbf{求解器名称} & \textbf{MHD} & \textbf{CHT} & \textbf{isoAdvector} & \textbf{varRho} & \textbf{Cpad} & \textbf{\_mod} \\
+\midrule
+compressibleInterFlow        &     &     & $\checkmark$ &   &   &   \\
+compressibleInterFlowCpad    &     &     & $\checkmark$ &   & $\checkmark$ &   \\
+varRhoInterFoam              &     &     &   & $\checkmark$ &   &   \\
+varRhoInterFoamCpad          &     &     &   & $\checkmark$ & $\checkmark$ &   \\
+varRhoInterIsoFoam           &     &     & $\checkmark$ & $\checkmark$ &   &   \\
+varRhoInterIsoFoamCpad       &     &     & $\checkmark$ & $\checkmark$ & $\checkmark$ &   \\
+mhdVarRhoInterFoam           & $\checkmark$ & &   & $\checkmark$ &   &   \\
+mhdVarRhoInterFoamCpad       & $\checkmark$ & &   & $\checkmark$ & $\checkmark$ &   \\
+mhdVarRhoInterIsoFoam        & $\checkmark$ & & $\checkmark$ & $\checkmark$ &   &   \\
+mhdVarRhoInterIsoFoamCpad    & $\checkmark$ & & $\checkmark$ & $\checkmark$ & $\checkmark$ &   \\
+mhdVarRhoInterIsoFoamCpad\_mod & $\checkmark$ & & $\checkmark$ & $\checkmark$ & $\checkmark$ & $\checkmark$ \\
+chtMultiRegionInterFoam      &     & $\checkmark$ &   &   &   &   \\
+chtMultiRegionInterIsoFoam   &     & $\checkmark$ & $\checkmark$ &   &   &   \\
+mhdChtMultiRegionInterFoam   & $\checkmark$ & $\checkmark$ &   &   &   &   \\
+mhdChtMultiRegionInterFoamCpad & $\checkmark$ & $\checkmark$ &   &   & $\checkmark$ &   \\
+mhdChtMultiRegionInterIsoFoam & $\checkmark$ & $\checkmark$ & $\checkmark$ &   &   &   \\
+mhdChtMultiRegionInterIsoFoamCpad & $\checkmark$ & $\checkmark$ & $\checkmark$ &   & $\checkmark$ &   \\
+mhdChtMultiRegionInterIsoFoamCpad\_mod & $\checkmark$ & $\checkmark$ & $\checkmark$ &   & $\checkmark$ & $\checkmark$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{源码复用关系}
+
+\begin{longtable}{@{}L{0.23\textwidth}L{0.31\textwidth}L{0.38\textwidth}@{}}
+\toprule
+\textbf{族} & \textbf{基础目录/模型} & \textbf{增量组合}\\
+\midrule
+\endhead
+可压两相 &
+\path{compressibleInterFlow} &
+VoF-Library 几何输运；Cpad 版本增加后处理。\\
+不可压 varRho &
+\path{varRhoInterFoam} &
+\path{varRhoInterIsoFoam} 增加几何输运；
+Cpad 版本增加后处理。\\
+单区域 MHD &
+\path{mhdVarRhoInterFoam} &
+在 varRho 族上链接 EOF 并加入 \texttt{JxB}；
+Iso/Cpad/\texttt{\_mod} 继续叠加。\\
+多区域 CHT &
+\path{chtMultiRegionFoam} 与
+\path{chtMultiRegionInterFoam} &
+\path{chtMultiRegionInterIsoFoam} 替换界面输运路径。\\
+MHD--CHT &
+MHD--CHT 基线目录 &
+链接 EOF，流体接收 \texttt{JxB}/\texttt{JH}，
+固体接收 \texttt{JH}；Iso/Cpad/\texttt{\_mod} 继续叠加。\\
+\bottomrule
+\end{longtable}
+
+% ============================================================================
+\section{编译、配置与使用方法}
+% ============================================================================
+
+\subsection{环境前提}
+
+\begin{itemize}
+    \item 目标版本是 \textbf{OpenFOAM.com v1912}。更高版本的 API、
+    库名、边界条件和 \texttt{wmake} 路径很可能需要移植。
+    \item Elmer FEM 必须启用 MPI；OpenFOAM 与 Elmer 必须链接到同一
+    MPI 实现，否则 MPMD 作业通常会在启动或通信阶段失败。
+    \item \texttt{etc/.bashrc} 只是模板。需要把 \texttt{MYPATH}
+    设置为仓库根目录，把 \texttt{FOAM\_PATH} 和 \texttt{ELMER\_PATH}
+    指向实际安装。
+\end{itemize}
+
+当前模板还包含两个路径/命令问题，使用前应修正：
+\begin{itemize}
+    \item \texttt{EOF\_MR\_SOLVER\_SRC} 应指向
+    \texttt{\$MYPATH/libs/eof/elmer\_mr\_solver}；
+    \item \texttt{eofCompile()} 中
+    \texttt{wmake \$EOF\_OF\_SRC/coupleElmer} 会重复目录名，
+    应直接对 \texttt{\$EOF\_OF\_SRC} 执行 \texttt{wmake}。
+\end{itemize}
+
+\subsection{建议编译顺序}
+
+下面命令表达依赖顺序；具体 \texttt{wmake} 语法可按本机 OpenFOAM
+环境调整：
+
+\begin{lstlisting}[style=cppstyle, language=bash]
+export REPO=/path/to/OpenFOAM--MHD--VoF-Solver-Collection-master
+source /opt/openfoam/OpenFOAM-v1912/etc/bashrc
+export PATH=/opt/elmerfem/elmer-mpi-install/bin:$PATH
+
+# 1. Geometric VOF library, required by InterIso/InterFlow solvers
+wmake libso "$REPO/libs/VoF_Library/VoF"
+
+# 2. varRho turbulence library, only for varRho solver family
+wmake libso "$REPO/libs/varRhoIncompressible"
+
+# 3. EOF OpenFOAM-side coupling library
+wmake libso "$REPO/libs/eof/coupleElmer"
+
+# 4. EOF Elmer-side multi-region solvers
+elmerf90 -o "$REPO/libs/eof/elmer_mr_solver/Elmer2OpenFOAM.so" \
+  -J"$REPO/libs/eof/elmer_mr_solver" \
+  "$REPO/libs/eof/elmer_mr_solver/Elmer2OpenFOAM.F90"
+elmerf90 -o "$REPO/libs/eof/elmer_mr_solver/OpenFOAM2Elmer.so" \
+  -J"$REPO/libs/eof/elmer_mr_solver" \
+  "$REPO/libs/eof/elmer_mr_solver/OpenFOAM2Elmer.F90"
+
+# 5. Target solver
+wmake "$REPO/solver/chtMultiRegionFoam/"\
+"mhdChtMultiRegionInterIsoFoamCpad_mod"
+\end{lstlisting}
+
+使用 Cpad 变体前还要安装 of-cpad-library，生成
+\texttt{libcpad}，并使其头文件路径与各 \texttt{Make/options} 中的
+\texttt{libs/of-cpad-library/src/lnInclude} 一致。
+
+\subsection{EOF 和 OpenFOAM v1912 特殊处理}
+
+\begin{enumerate}
+    \item 备份 \texttt{\$FOAM\_SRC/Pstream/mpi}。
+    \item 检查 \texttt{libs/commSplit\_modifed\_1912/install\_mod.sh}
+    中的路径后，再复制补丁并重编译 Pstream。该脚本会修改 OpenFOAM
+    安装树，不应在未备份时直接运行。
+    \item 将 \texttt{libs/eof/elmer\_mr\_solver/SOLVER.KEYWORDS\_mod}
+    中新增的 \texttt{Bodies} 和
+    \texttt{Body i Use Target Variable} 关键字合并到 Elmer 安装的
+    \texttt{SOLVER.KEYWORDS}。
+    \item 确保 \texttt{Elmer2OpenFOAM.so} 和
+    \texttt{OpenFOAM2Elmer.so} 能被 Elmer 的
+    \texttt{Procedure} 路径找到。
+\end{enumerate}
+
+\subsection{随附 ESR 算例}
+
+算例位于
+\texttt{examples/mhdChtMultiRegionInterIsoFoam\_mod}，包含一个流体区
+\texttt{mixture} 和两个固体区 \texttt{skin}/\texttt{mould}。
+推荐流程如下：
+
+\begin{enumerate}
+    \item 从 \texttt{meshElmer/mesh.grd} 生成 Elmer 网格，确认存在
+    \texttt{mesh.header}、\texttt{mesh.nodes}、
+    \texttt{mesh.elements} 和 \texttt{mesh.boundary}。
+    \item 检查 \texttt{system/controlDict} 的求解器名称、时间步、
+    \texttt{maxCo}、\texttt{maxDi} 和输出频率。
+    \item 令根目录及每个区域的 \texttt{decomposeParDict} 使用相同
+    \texttt{numberOfSubdomains=N}，并把 \texttt{Allrun.eof} 中
+    \texttt{cpu\_cores} 同步为 $N$。
+    \item 检查 \texttt{case\_eof\_harm.sif} 中频率、电流密度、
+    Elmer body 编号、\texttt{Bodies} 映射和目标变量顺序。
+    \item 执行预处理，再以 MPMD 方式同时启动 OpenFOAM 与 Elmer。
+\end{enumerate}
+
+\begin{lstlisting}[style=cppstyle, language=bash]
+cd "$REPO/examples/mhdChtMultiRegionInterIsoFoam_mod"
+./Allrun.pre
+
+# Allrun.eof performs Elmer partitioning and decomposePar -allRegions,
+# then launches the equivalent of:
+mpirun -n N mhdChtMultiRegionInterIsoFoamCpad_mod -parallel \
+  : -n N ElmerSolver_mpi case_eof_harm.sif
+\end{lstlisting}
+
+\subsection{关键字典}
+
+\begin{longtable}{@{}L{0.42\textwidth}L{0.52\textwidth}@{}}
+\toprule
+\textbf{文件} & \textbf{作用} \\
+\midrule
+\endhead
+\texttt{constant/regionProperties} &
+声明 \texttt{mixture} 为流体区，\texttt{skin}/\texttt{mould} 为固体区。\\
+\shortstack[l]{\texttt{constant/mixture/}\\
+\texttt{thermophysicalProperties}} &
+相名、表面张力、最低压力和 \texttt{maxRelDiff}。\\
+\texttt{constant/mixture/thermo.*} 或相热物性字典 &
+两相 $\rho$、$C_v$、黏度、热导率和电导率 \texttt{elcond}。\\
+\texttt{system/mixture/fvSolution} &
+界面输运、重构方法、PIMPLE 次数、线性求解器和松弛。\\
+\texttt{system/mixture/fvSchemes} &
+时间、梯度、对流、扩散和电导率插值格式。\\
+\texttt{system/cpad} &
+目标相、阈值以及按 faces/edges/points 判断连通。\\
+\texttt{case\_eof\_harm.sif} &
+Elmer 谐波电磁方程、材料、边界、电导率输入及 JxB/JH 输出映射。\\
+\bottomrule
+\end{longtable}
+
+\subsection{运行检查清单}
+
+\begin{itemize}
+    \item 启动日志应先出现每个流体区发送 \texttt{elcond}，随后接收
+    \texttt{JxB\_recv}/\texttt{JH\_recv}，固体区接收 \texttt{JH\_recv}。
+    \item 检查 \texttt{alpha.metal} 的最小/最大值、总质量、压力下限、
+    Courant 数和固体扩散数。
+    \item 检查 \texttt{JxB} 的单位为 $\mathrm{N/m^3}$、
+    \texttt{JH} 的单位为 $\mathrm{W/m^3}$，并验证流体温升方向。
+    \item 若长时间看不到 ``FOAM: Continue Elmer!''，检查
+    \texttt{maxRelDiff} 是否过大；若每步都重算，则检查阈值和相分数噪声。
+    \item 结束时确认 OpenFOAM 与 Elmer 都正常退出。任一侧提前退出都可能
+    让另一侧阻塞在发送/接收调用。
+\end{itemize}
+
+% ============================================================================
+\section{MPI 通信修正}
+% ============================================================================
+
+EOF 库需要修改 OpenFOAM v1912 的 MPI 通信模块（\texttt{commSplit\_modifed\_1912/}），因为 OpenFOAM 的 Pstream 实现与 EOF 库的 MPI 通信假设存在兼容性问题。修改涉及以下文件：
+
+\begin{itemize}
+    \item \texttt{PstreamGlobals.C} / \texttt{PstreamGlobals.H}：全局 MPI 通信器管理
+    \item \texttt{UPstream.C}：并行数据流基类
+    \item \texttt{UIPread.C}：并行输入读取
+    \item \texttt{UOPwrite.C}：并行输出写入
+    \item \texttt{allReduce.H} / \texttt{allReduceTemplates.C}：全局归约操作
+\end{itemize}
+
+安装脚本 \texttt{install\_mod.sh} 自动将这些文件复制到 OpenFOAM 安装目录的对应位置。
+
+% ============================================================================
+\section{源码审计发现与验证边界}
+% ============================================================================
+
+\begin{longtable}{@{}L{0.25\textwidth}L{0.37\textwidth}L{0.31\textwidth}@{}}
+\toprule
+\textbf{发现} & \textbf{影响} & \textbf{建议} \\
+\midrule
+\endhead
+流体 \texttt{mhdTEqn.H} 中 \texttt{+JH} 位于左侧 &
+按通常矩阵符号会表现为热汇，与固体方程及物理预期不一致 &
+用零流动、均匀正 \texttt{JH} 的单元算例检查温升方向后再生产使用。\\
+\texttt{maxAlphaCo} 未进入多区域时间步控制头文件 &
+界面 Courant 数只打印，不限制全局时间步 &
+保守设置 \texttt{maxCo}/\texttt{maxDeltaT}，或修改时间步控制。\\
+电磁更新在时间步末发生 &
+当前时间步使用上一次 Elmer 场，属于滞后分区耦合 &
+对快速界面运动降低 \texttt{maxRelDiff}，并做时间步敏感性研究。\\
+\texttt{maxRelDiff} 实际是最大绝对相分数差 &
+名称可能让用户误认为是相对误差 &
+把阈值解释为 $[0,1]$ 相分数的绝对变化。\\
+\texttt{\_mod} 版使用硬截止 &
+$\sigma(\alpha)$ 在阈值处不连续，可能使电磁解跳变 &
+对 $0.1$（CHT）或 $0.5$（单区域）做参数敏感性分析。\\
+Cpad 源码缺失且 Make 路径指向另一目录名 &
+Cpad 求解器在当前快照中无法直接链接 &
+补齐上游库，统一路径后再编译。\\
+\texttt{etc/.bashrc} 含路径和函数拼接错误 &
+照抄模板会找不到 EOF 多区域源码或重复目录 &
+按本章给出的真实仓库路径手动配置。\\
+仓库作者声明未做数学验证/确认 &
+结果不能仅凭程序收敛视为可信 &
+至少完成守恒、网格、时间步、耦合阈值和实验基准验证。\\
+\bottomrule
+\end{longtable}
+
+% ============================================================================
+\section{数值方法总结}
+% ============================================================================
+
+\subsection{空间离散}
+
+随附算例而非求解器硬编码的主要选择为：
+\begin{itemize}
+    \item 梯度：\texttt{cellLimited leastSquares 1.0}；
+    \item 动量对流：\texttt{Gauss linearUpwind grad(U)}；
+    \item 温度、动能、压力和密度相关对流：\texttt{Gauss linear}；
+    \item 湍流标量：\texttt{Gauss upwind}；
+    \item Laplacian 与法向梯度：\texttt{linear corrected}/\texttt{corrected}；
+    \item 界面：\texttt{plicRDF} 重构和 \texttt{isoAdvector} 输运；
+    \item 表面张力由 mixture 模型提供，动量预测中通过
+    \texttt{mixture.surfaceTensionForce()} 加入。
+\end{itemize}
+
+\subsection{时间离散}
+
+\begin{itemize}
+    \item 算例所有区域使用 \texttt{Euler} 一阶隐式时间离散；
+    \item 相分数设置 \texttt{nAlphaSubCycles 2}；
+    \item MULES 兼容头文件支持 Crank--Nicolson，但与多重相分数子循环
+    不兼容；主线几何输运的可用组合还需以 VoF-Library 实现为准。
+\end{itemize}
+
+\subsection{线性求解器}
+
+\begin{itemize}
+    \item 流体压力 \texttt{p\_rgh}：GAMG + Gauss--Seidel smoother；
+    \item 速度：\texttt{smoothSolver} + Gauss--Seidel；
+    \item $T$ 与湍流标量：\texttt{smoothSolver} + symGauss--Seidel；
+    \item 固体焓 $h$：PCG + DIC；
+    \item 相分数由几何输运/限制器更新，不走普通标量线性求解器。
+\end{itemize}
+
+% ============================================================================
+\section{结论}
+% ============================================================================
+
+本文档从源码和算例还原了求解器的真实控制流。该集合的主要工程组合包括：
+
+\begin{enumerate}
+    \item \textbf{多物理场组合}：VOF 多相流、MHD 电磁力/焦耳热和多区域共轭传热；varRho 是另一条单区域求解器族
+    \item \textbf{自适应耦合策略}：基于相分数变化的自适应 MHD 耦合触发机制，有效降低了计算开销
+    \item \textbf{尖锐界面捕捉}：通过 isoAdvector 几何重构方法实现优于标准 VOF 的界面分辨率
+    \item \textbf{多区域扩展}：对 EOF 库进行了多区域/多体扩展，支持流体-固体多区域 MHD 耦合
+    \item \textbf{模块化复用}：通过主程序、头文件和链接库组合形成多个复杂度级别的求解器变体
+\end{enumerate}
+
+该仓库提供了有价值的 ESR 电磁--热--流--界面耦合原型，但当前快照
+仍存在第三方库缺失、环境脚本错误、显式滞后耦合和焦耳热符号疑点。
+在补齐依赖并完成守恒性、网格、时间步、耦合阈值和实验验证之前，
+应把它视为研究代码而不是已认证的工业预测工具。
+
+% ============================================================================
+% 参考文献
+% ============================================================================
+
+\begin{thebibliography}{99}
+
+\bibitem{Vencels2019}
+J. Vencels, P. R\aa back, V. Ge\v{z}a,
+``EOF-Library: Open-source Elmer FEM and OpenFOAM coupler for electromagnetics and fluid dynamics,''
+\textit{SoftwareX}, vol.~9, pp.~68--72, 2019.
+\url{https://doi.org/10.1016/j.softx.2019.01.007}
+
+\bibitem{Roenby2016}
+J. Roenby, H. Bredmose, H. Jasak,
+``A computational method for sharp interface advection,''
+\textit{Royal Society Open Science}, vol.~3, no.~11, p.~160405, 2016.
+\url{https://doi.org/10.1098/rsos.160405}
+
+\bibitem{Fan2019}
+W. Fan, H. Anglart,
+``varRhoTurbVOF: A new set of volume of fluid solvers for turbulent isothermal multiphase flows in OpenFOAM,''
+\textit{Computer Physics Communications}, p.~106876, 2019.
+\url{https://doi.org/10.1016/j.cpc.2019.106876}
+
+\bibitem{Vachaparambil2019}
+K.~J. Vachaparambil, K.~E. Einarsrud,
+``Comparison of Surface Tension Models for the Volume of Fluid Method,''
+\textit{Processes}, vol.~7, no.~8, p.~542, 2019.
+\url{https://doi.org/10.3390/pr7080542}
+
+\end{thebibliography}
+
+\end{document}

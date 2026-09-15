@@ -1,0 +1,541 @@
+% !TEX program = xelatex
+% Compile with:
+%   xelatex phase_change_models.tex
+%
+% Sign convention used below:
+%   \dot{m} > 0 denotes liquid-to-vapour phase change.
+
+\documentclass[UTF8,fontset=none]{ctexart}
+
+\usepackage{amsmath,amssymb,bm}
+\usepackage{booktabs,tabularx,array}
+\usepackage{geometry}
+\usepackage{hyperref}
+
+\setCJKmainfont{Songti SC}
+\setCJKsansfont{Songti SC}
+\setCJKmonofont{Songti SC}
+
+\geometry{a4paper, margin=2.5cm}
+\hypersetup{
+  colorlinks=true,
+  linkcolor=blue,
+  citecolor=blue,
+  urlcolor=blue
+}
+
+\title{相变模型卡}
+\author{}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+\tableofcontents
+\newpage
+
+\section{相变模型卡}
+\label{sec:phase-change-model-cards}
+
+本节把相变模型按统一的模型卡格式整理。模型卡不把模型系数当成可任意调参的
+``magic number''，而是记录模型假设、守恒耦合、适用范围和失效场景，方便后续
+在 OpenFOAM 工程流程、Level Set/GFM 研究路线和论文综述之间保持同一套语言。
+下文统一采用 $\dot{m}>0$ 表示液相向气相转化。
+
+\subsection{空白模型卡模板}
+\label{subsec:phase-change-card-template}
+
+\begingroup
+\small
+\renewcommand{\arraystretch}{1.18}
+\noindent\begin{tabularx}{\linewidth}{@{}>{\bfseries}p{0.19\linewidth}X@{}}
+\toprule
+模型名 & 需要填写模型的常用名称、缩写和同义名称。 \\
+相变类型 & 蒸发/冷凝、沸腾、空化、熔化/凝固、升华/凝华，或多机制耦合。 \\
+控制方程 & 写清质量、动量、能量、体积分数、界面追踪或相场方程中新增的项。 \\
+源项或界面条件 & 写出 $\dot{m}$、潜热源、界面速度、跳跃条件或壁面热流分配。 \\
+热力学假设 & 饱和温度/饱和压力、局部热平衡、界面温度、相平衡或非平衡动力学假设。 \\
+必要参数 & 潜热、物性、饱和性质、气泡半径、成核密度、经验系数、接触角等。 \\
+适用范围 & 该模型被设计用来描述的流动尺度、相态、壁面条件和数值方法。 \\
+失效场景 & 哪些物理或数值条件下不能信任该模型，尤其是网格依赖和系数不可辨识问题。 \\
+实现路线 & 对应 OpenFOAM/VOF/Level Set/GFM/相场/FVM/FDM 的实现方式。 \\
+验证算例 & Stefan 问题、气泡增长、膜沸腾、池沸腾、空化水翼、PCM 熔化等。 \\
+参考文献 & 原始论文、模型综述、开源实现或物性数据库。 \\
+\bottomrule
+\end{tabularx}
+\endgroup
+
+\subsection{Lee 型热松弛蒸发/冷凝源项}
+\label{subsec:card-lee-relaxation}
+
+\begingroup
+\small
+\renewcommand{\arraystretch}{1.18}
+\noindent\begin{tabularx}{\linewidth}{@{}>{\bfseries}p{0.19\linewidth}X@{}}
+\toprule
+模型名 & Lee 型蒸发/冷凝模型；thermal relaxation mass-transfer model。 \\
+相变类型 & 温度驱动的液--气蒸发和冷凝，常用于 VOF 或 Eulerian 两相 FVM。 \\
+控制方程 &
+体积分数或相质量方程中加入相间质量源：
+\[
+  \frac{\partial(\alpha_v\rho_v)}{\partial t}
+  + \nabla\cdot(\alpha_v\rho_v\mathbf{u})
+  = \dot{m}_{lv}-\dot{m}_{vl}.
+\]
+能量方程必须同步加入潜热项；若 $\dot{m}=\dot{m}_{lv}-\dot{m}_{vl}$，
+则常用符号下可写为 $S_E=-\dot{m}L$。 \\
+源项或界面条件 &
+常见形式为
+\[
+  \dot{m}_{lv}
+  = C_e \alpha_l\rho_l
+    \frac{\max(T-T_{\mathrm{sat}},0)}{T_{\mathrm{sat}}},
+  \qquad
+  \dot{m}_{vl}
+  = C_c \alpha_v\rho_v
+    \frac{\max(T_{\mathrm{sat}}-T,0)}{T_{\mathrm{sat}}}.
+\]
+$C_e$ 和 $C_c$ 是具有时间倒数维度的松弛系数。 \\
+热力学假设 & 相变由局部过热或过冷驱动；界面未被 sharp-interface 解析；
+$T_{\mathrm{sat}}$ 可来自常数、压力相关饱和曲线或物性库。 \\
+必要参数 & $C_e$、$C_c$、$L$、$T_{\mathrm{sat}}(p)$、$\rho_l$、$\rho_v$、
+$c_p$、$k$，以及体积分数截断范围。 \\
+适用范围 & 工程 VOF/Eulerian 两相计算中的第一版蒸发/冷凝闭式模型；
+适合做参数敏感性和软件流程验证。 \\
+失效场景 & 系数强网格依赖；不能解析界面热阻、Knudsen 层、接触线、成核物理；
+若能量方程没有潜热耦合，质量源会制造非守恒结果。 \\
+实现路线 & 优先放在 OpenFOAM FVM 求解器中。若在 sonicSolver 中做研究版，
+应把源项作为显式 phase-change model，并对 $T_{\mathrm{sat}}$ 和能量耦合
+做 fail-fast 检查。 \\
+验证算例 & 一维蒸发/冷凝层、封闭容器回归到饱和态、给定热通量下液层蒸发速度。 \\
+参考文献 & Lee 型源项通常追溯到 Lee 的压力迭代两相模型 \protect\cite{Lee1980}；
+连续场界面源项可参考 Hardt 和 Wondra \protect\cite{HardtWondra2008}。 \\
+\bottomrule
+\end{tabularx}
+\endgroup
+
+\subsection{Stefan sharp-interface 相变条件}
+\label{subsec:card-stefan}
+
+\begingroup
+\small
+\renewcommand{\arraystretch}{1.18}
+\noindent\begin{tabularx}{\linewidth}{@{}>{\bfseries}p{0.19\linewidth}X@{}}
+\toprule
+模型名 & Stefan 条件；sharp-interface energy-balance model。 \\
+相变类型 & 由界面热通量差驱动的蒸发/冷凝或熔化/凝固。 \\
+控制方程 & 两侧相内分别求解热方程、动量方程和界面追踪方程；
+界面 $\Gamma$ 上施加质量、能量和力学跳跃条件。 \\
+源项或界面条件 &
+若法向 $\mathbf{n}$ 从液相指向气相，界面能量平衡常写为
+\[
+  \dot{m} L
+  = k_l\nabla T_l\cdot\mathbf{n}
+  - k_v\nabla T_v\cdot\mathbf{n}.
+\]
+界面法向速度满足
+\[
+  V_\Gamma
+  = \mathbf{u}_l\cdot\mathbf{n}-\frac{\dot{m}}{\rho_l}
+  = \mathbf{u}_v\cdot\mathbf{n}-\frac{\dot{m}}{\rho_v}.
+\]
+强相变或高速流还需要动量跳跃、表面张力和相变 recoil pressure。 \\
+热力学假设 & 界面通常取饱和温度 $T_\Gamma=T_{\mathrm{sat}}(p_\Gamma)$；
+相内可非等温，但界面局部热力学平衡。 \\
+必要参数 & $L$、$k_l$、$k_v$、$\rho_l$、$\rho_v$、$T_{\mathrm{sat}}(p)$、
+$\sigma$、界面法向和曲率。 \\
+适用范围 & sharp-interface Level Set/GFM、front tracking、界面解析 VOF；
+是研究级相变模型的核心基准。 \\
+失效场景 & 界面温度不处于平衡、强非平衡蒸发、微纳尺度 Knudsen 层、
+接触线沸腾和未解析成核时，需要额外模型。 \\
+实现路线 & 适合作为 sonicSolver Level Set/GFM 后续相变核心：
+Level Set 提供 $\mathbf{n}$、$\kappa$ 和界面位置，GFM/跳跃修正处理温度、
+压力和速度不连续。工程 VOF 中可通过界面重构和连续场源项近似。 \\
+验证算例 & 一维 Stefan 熔化、二维圆形液滴蒸发、Stefan 流、气泡热扩散增长。 \\
+参考文献 & 移动边界问题基础见 Crank \protect\cite{Crank1984}；
+界面源项的连续场离散见 Hardt 和 Wondra \protect\cite{HardtWondra2008}。 \\
+\bottomrule
+\end{tabularx}
+\endgroup
+
+\subsection{Hertz--Knudsen--Schrage 界面动力学模型}
+\label{subsec:card-hertz-knudsen-schrage}
+
+\begingroup
+\small
+\renewcommand{\arraystretch}{1.18}
+\noindent\begin{tabularx}{\linewidth}{@{}>{\bfseries}p{0.19\linewidth}X@{}}
+\toprule
+模型名 & Hertz--Knudsen--Schrage，简称 HKS 或 Schrage 模型。 \\
+相变类型 & 界面非平衡蒸发/冷凝，尤其用于低压、稀薄气体或快速界面相变。 \\
+控制方程 & 界面质量通量由分子动理论给出，再通过界面速度和潜热源耦合到连续介质方程。 \\
+源项或界面条件 &
+一种常用 Schrage 形式为
+\[
+  \dot{m}
+  = \frac{2a}{2-a}\sqrt{\frac{M}{2\pi R}}
+  \left(
+    \frac{p_{\mathrm{sat}}(T_l)}{\sqrt{T_l}}
+    - \frac{p_v}{\sqrt{T_v}}
+  \right),
+\]
+其中 $a$ 为 accommodation coefficient，$M$ 为摩尔质量。 \\
+热力学假设 & 界面两侧可存在温度或压力非平衡；气相近界面分子分布被简化为
+修正 Maxwellian。 \\
+必要参数 & $a$、$M$、$p_{\mathrm{sat}}(T)$、$T_l$、$T_v$、$p_v$、$L$；
+若接入流场，还需要界面法向速度和质量跳跃条件。 \\
+适用范围 & 真空蒸发、微尺度蒸发、快速液滴蒸发、界面动力学研究；
+比 Lee 型模型更接近界面物理。 \\
+失效场景 & 高压稠密气体、强非理想 EOS、多组分扩散控制蒸发、湍流壁面沸腾；
+$a$ 难以测定，模型对该参数敏感。 \\
+实现路线 & 对 sharp-interface/Level Set 路线较自然：先在界面计算 $\dot{m}$，
+再把相变速度用于 $\phi$ 推进和 GFM 跳跃条件。VOF 中需要可靠的界面面积和
+温度外推。 \\
+验证算例 & 真空中平面液面蒸发、孤立液滴蒸发、低压蒸发/冷凝实验。 \\
+参考文献 & Schrage 的界面传质理论是常用入口 \protect\cite{Schrage1953}；
+与 Stefan 条件结合时可参考 sharp-interface 相变文献。 \\
+\bottomrule
+\end{tabularx}
+\endgroup
+
+\subsection{焓--孔隙率熔化/凝固模型}
+\label{subsec:card-enthalpy-porosity}
+
+\begingroup
+\small
+\renewcommand{\arraystretch}{1.18}
+\noindent\begin{tabularx}{\linewidth}{@{}>{\bfseries}p{0.19\linewidth}X@{}}
+\toprule
+模型名 & Enthalpy--porosity method；固定网格焓法；mushy-zone model。 \\
+相变类型 & 固--液熔化和凝固，尤其是 PCM、金属熔化、自然对流熔化。 \\
+控制方程 &
+总焓写为
+\[
+  H = h(T) + \lambda L,
+\]
+其中 $\lambda\in[0,1]$ 是液相率。能量方程求解 $H$ 或 $T$--$\lambda$ 耦合；
+动量方程中加入 mushy-zone 阻尼。 \\
+源项或界面条件 &
+常见 Darcy 型阻尼为
+\[
+  \mathbf{S}_u
+  = - A_m
+  \frac{(1-\lambda)^2}{\lambda^3+\epsilon}
+  \mathbf{u},
+\]
+使固相区速度被压制，糊状区作为多孔介质。 \\
+热力学假设 & 相变在给定熔点或熔化温度区间内通过液相率释放/吸收潜热；
+界面被糊状区涂抹而非 sharp-interface 解析。 \\
+必要参数 & $L$、$T_m$ 或 solidus/liquidus 温度、$c_p$、$k$、$\rho$、
+黏度、热膨胀系数、mushy-zone constant $A_m$。 \\
+适用范围 & 工程 PCM、金属凝固、固液相变 FVM；对复杂几何和自然对流很实用。 \\
+失效场景 & $A_m$ 可导致强参数敏感性；界面厚度受网格和温度区间控制；
+不适合需要尖锐界面动力学、枝晶形貌或微观凝固组织的研究。 \\
+实现路线 & 适合 OpenFOAM/FVM 主线。sonicSolver 若研究相变几何，可把该模型作为
+工程对照，而不是高阶 Level Set sharp-interface 的核心。 \\
+验证算例 & 一维 Stefan 熔化、矩形腔 PCM 自然对流熔化、Gau--Viskanta 熔化实验。 \\
+参考文献 & 固定网格焓--孔隙率模型见 Voller 和 Prakash \protect\cite{VollerPrakash1987}；
+金属熔化算例见 Brent、Voller 和 Reid \protect\cite{BrentVollerReid1988}。 \\
+\bottomrule
+\end{tabularx}
+\endgroup
+
+\subsection{RPI 壁面沸腾热流分配模型}
+\label{subsec:card-rpi-wall-boiling}
+
+\begingroup
+\small
+\renewcommand{\arraystretch}{1.18}
+\noindent\begin{tabularx}{\linewidth}{@{}>{\bfseries}p{0.19\linewidth}X@{}}
+\toprule
+模型名 & RPI wall boiling model；Kurul--Podowski heat-flux partitioning model。 \\
+相变类型 & 壁面成核沸腾，常用于 Eulerian 两流体模型或工程热工水力 CFD。 \\
+控制方程 & 不是单独的体相相变模型，而是壁面热通量边界模型；
+相间质量源来自壁面蒸发热流。 \\
+源项或界面条件 &
+壁面热流分解为
+\[
+  q''_w = q''_c + q''_q + q''_e,
+\]
+其中 $q''_c$ 为单相对流，$q''_q$ 为气泡脱离后的液体淬冷，
+$q''_e$ 为蒸发潜热项。壁面质量源常由
+$\dot{m}''_w=q''_e/L$ 得到。 \\
+热力学假设 & 壁面过热驱动气泡成核；气泡脱离直径、脱离频率、成核点密度和影响面积
+由经验关联式关闭。 \\
+必要参数 & 成核点密度 $N_a$、气泡脱离直径 $d_d$、脱离频率 $f_d$、等待时间、
+气泡影响面积分数、接触角、壁面函数和湍流模型。 \\
+适用范围 & 核反应堆子通道、管内亚冷沸腾、工程壁面沸腾；
+通常与 Eulerian 两流体模型、wall functions 和湍流模型一起使用。 \\
+失效场景 & 临界热流、膜沸腾、微通道强受限沸腾、接触线解析 DNS；
+闭式关联式高度依赖流型和工况。 \\
+实现路线 & 工程液冷/相变主线应优先通过成熟 OpenFOAM 分支或专用求解器接入；
+不建议在 sonicSolver 第一版多相模块中手写完整 RPI 壁面沸腾。 \\
+验证算例 & DEBORA、BFBT/PSBT 子冷沸腾数据、管内壁面沸腾实验、加热板气泡生成。 \\
+参考文献 & 原始热流分配思想见 Kurul 和 Podowski \protect\cite{KurulPodowski1990}；
+后续工程 CFD 模型通常在两流体沸腾框架中扩展。 \\
+\bottomrule
+\end{tabularx}
+\endgroup
+
+\subsection{Schnerr--Sauer 空化模型}
+\label{subsec:card-schnerr-sauer}
+
+\begingroup
+\small
+\renewcommand{\arraystretch}{1.18}
+\noindent\begin{tabularx}{\linewidth}{@{}>{\bfseries}p{0.19\linewidth}X@{}}
+\toprule
+模型名 & Schnerr--Sauer cavitation model。 \\
+相变类型 & 压力驱动液--汽空化，属于均质混合物/VOF 传输型空化模型。 \\
+控制方程 & 在汽相体积分数或相质量方程中加入蒸发/冷凝源项；
+源项来自简化 Rayleigh--Plesset 气泡动力学。 \\
+源项或界面条件 &
+典型结构为
+\[
+  \dot{m}\propto
+  \frac{\rho_l\rho_v}{\rho_m}
+  \frac{\alpha_l\alpha_v}{R_b}
+  \operatorname{sgn}(p_{\mathrm{sat}}-p)
+  \sqrt{\frac{2|p-p_{\mathrm{sat}}|}{3\rho_l}},
+\]
+其中气泡半径 $R_b$ 可由气泡数密度 $n_0$ 和汽相体积分数估算。 \\
+热力学假设 & 空化主要由局部压力相对饱和压力的偏离驱动；
+热效应常被忽略或弱化，液汽之间近似机械非平衡、热平衡。 \\
+必要参数 & 气泡数密度 $n_0$ 或初始空核信息、$p_{\mathrm{sat}}$、$\rho_l$、
+$\rho_v$、源项系数、湍流模型。 \\
+适用范围 & 泵、喷嘴、水翼、螺旋桨等工程空化；适合大尺度空泡云而非单泡解析。 \\
+失效场景 & 热空化、强可压缩冲击、单个气泡坍塌冲击波、非凝结气体传质；
+气泡数密度不可辨识时预测会强依赖调参。 \\
+实现路线 & OpenFOAM 空化求解器已有类似模型，可作为工程主线；
+若做高阶 FDM 研究，应先用 Rayleigh--Plesset 单泡问题验证源项时间尺度。 \\
+验证算例 & 水翼片空化、Venturi 空化、喷嘴空化、Rayleigh 单泡增长/坍塌。 \\
+参考文献 & 模型源头见 Schnerr 和 Sauer \protect\cite{SchnerrSauer2001}；
+空化传输模型可与 Zwart--Gerber--Belamri 对照 \protect\cite{ZwartGerberBelamri2004}。 \\
+\bottomrule
+\end{tabularx}
+\endgroup
+
+\subsection{Zwart--Gerber--Belamri 空化模型}
+\label{subsec:card-zwart-gerber-belamri}
+
+\begingroup
+\small
+\renewcommand{\arraystretch}{1.18}
+\noindent\begin{tabularx}{\linewidth}{@{}>{\bfseries}p{0.19\linewidth}X@{}}
+\toprule
+模型名 & Zwart--Gerber--Belamri cavitation model，简称 ZGB。 \\
+相变类型 & 压力驱动工程空化，常用于商业 CFD 和 OpenFOAM 派生实现。 \\
+控制方程 & 与 Schnerr--Sauer 类似，在相分数或相质量方程中加入蒸发/冷凝源项。 \\
+源项或界面条件 &
+常见写法区分蒸发和冷凝：
+\[
+  \dot{m}_{lv}
+  = F_{\mathrm{vap}}
+  \frac{3\alpha_{\mathrm{nuc}}(1-\alpha_v)\rho_v}{R_b}
+  \sqrt{\frac{2}{3}\frac{\max(p_{\mathrm{sat}}-p,0)}{\rho_l}},
+\]
+\[
+  \dot{m}_{vl}
+  = F_{\mathrm{cond}}
+  \frac{3\alpha_v\rho_v}{R_b}
+  \sqrt{\frac{2}{3}\frac{\max(p-p_{\mathrm{sat}},0)}{\rho_l}}.
+\]
+ \\
+热力学假设 & 空核体积分数 $\alpha_{\mathrm{nuc}}$ 和代表气泡半径 $R_b$ 给定；
+源项由压力差控制。 \\
+必要参数 & $F_{\mathrm{vap}}$、$F_{\mathrm{cond}}$、$\alpha_{\mathrm{nuc}}$、
+$R_b$、$p_{\mathrm{sat}}$、液汽密度和湍流模型。 \\
+适用范围 & 工程空化 RANS/URANS，尤其是需要稳定而廉价的汽相源项时。 \\
+失效场景 & 系数经验性强；不解析气泡谱、非凝结气体、热效应和冲击；
+不能把调参后的局部汽相率直接解释为真实气泡尺度统计。 \\
+实现路线 & 适合作为 OpenFOAM 工程求解器中的候选空化模型；
+论文比较时应与 Schnerr--Sauer、Kunz 模型同时列出。 \\
+验证算例 & NACA 水翼、Venturi、喷孔、泵诱导轮空化。 \\
+参考文献 & 见 Zwart、Gerber 和 Belamri \protect\cite{ZwartGerberBelamri2004}；
+Kunz 等人的预条件空化模型可作为另一条对照路线 \protect\cite{Kunz2000}。 \\
+\bottomrule
+\end{tabularx}
+\endgroup
+
+\subsection{相场/弥散界面凝固模型}
+\label{subsec:card-phase-field-solidification}
+
+\begingroup
+\small
+\renewcommand{\arraystretch}{1.18}
+\noindent\begin{tabularx}{\linewidth}{@{}>{\bfseries}p{0.19\linewidth}X@{}}
+\toprule
+模型名 & Phase-field solidification；Cahn--Hilliard/Allen--Cahn diffuse-interface model。 \\
+相变类型 & 凝固、熔化、枝晶生长、多相界面演化；也可扩展到多组分合金。 \\
+控制方程 & 引入序参量 $\phi$ 和自由能泛函 $F[\phi,T]$。
+守恒序参量常用 Cahn--Hilliard 方程，
+\[
+  \frac{\partial\phi}{\partial t}
+  + \mathbf{u}\cdot\nabla\phi
+  = \nabla\cdot(M_\phi\nabla\mu),
+  \qquad
+  \mu=\frac{\delta F}{\delta\phi}.
+\]
+非守恒相变界面也可用 Allen--Cahn 型动力学。 \\
+源项或界面条件 & 相变由自由能差和界面能驱动；潜热通过温度方程与
+$\partial\phi/\partial t$ 耦合。界面厚度 $\epsilon$ 是显式模型参数。 \\
+热力学假设 & 相界面有有限厚度；界面能、各向异性和相图信息由自由能模型给出。 \\
+必要参数 & 界面厚度、迁移率、自由能参数、界面能、各向异性、潜热、热扩散率；
+合金问题还需要相图或 CALPHAD 数据。 \\
+适用范围 & 凝固微观组织、枝晶、拓扑变化和多界面相互作用；
+比焓--孔隙率更适合研究形貌。 \\
+失效场景 & 真实界面厚度远小于网格时需要薄界面渐近校正；
+工程尺度三维计算成本高；参数标定复杂。 \\
+实现路线 & 可作为 sonicSolver 长期研究模块或与 MOOSE 等框架对照；
+工程液冷第一版不建议优先走完整相场路线。 \\
+验证算例 & Mullins--Sekerka 不稳定性、枝晶生长、纯物质凝固、二元合金定向凝固。 \\
+参考文献 & 弥散界面自由能基础见 Cahn 和 Hilliard \protect\cite{CahnHilliard1958}；
+流体力学中的 diffuse-interface 综述见 Anderson 等 \protect\cite{AndersonMcFaddenWheeler1998}。 \\
+\bottomrule
+\end{tabularx}
+\endgroup
+
+\subsection{物性和饱和性质闭式关系}
+\label{subsec:card-thermophysical-closure}
+
+\begingroup
+\small
+\renewcommand{\arraystretch}{1.18}
+\noindent\begin{tabularx}{\linewidth}{@{}>{\bfseries}p{0.19\linewidth}X@{}}
+\toprule
+模型名 & Saturation-property closure；EOS/transport property closure。 \\
+相变类型 & 不是独立相变源项，而是所有相变模型的物性底座。 \\
+控制方程 & 为 $T_{\mathrm{sat}}(p)$、$p_{\mathrm{sat}}(T)$、$L(T)$、
+$\rho$、$c_p$、$k$、$\mu$、$\sigma$ 等提供一致关系。 \\
+源项或界面条件 & Lee、Stefan、HKS、空化、沸腾模型都依赖饱和性质；
+物性不一致会直接破坏能量守恒和相平衡。 \\
+热力学假设 & 可选理想气体、不可压液体、barotropic EOS、IAPWS 水/蒸汽公式、
+REFPROP/CoolProp 多工质物性等。 \\
+必要参数 & 工质名称、EOS 版本、参考态、单位制、有效温压范围、多组分混合规则。 \\
+适用范围 & 所有相变计算。水/蒸汽优先 IAPWS；制冷剂和混合工质可用 REFPROP 或
+CoolProp；快速工程模型可先用局部常物性，但必须标注有效范围。 \\
+失效场景 & 临界点附近、强非理想混合物、盐溶液/纳米流体、不可压近似越界；
+跨库参考态不一致会导致焓和潜热偏移。 \\
+实现路线 & OpenFOAM 工程流程中优先使用成熟 thermophysicalProperties；
+sonicSolver 若作为 level-set 几何库，只返回几何量，不直接承担完整 EOS。 \\
+验证算例 & 饱和表、Clausius--Clapeyron 关系、单元测试 $h_v-h_l=L$、
+等压加热跨相变过程。 \\
+参考文献 & 水/蒸汽性质见 IAPWS 公式 \protect\cite{IAPWSIF97}；
+通用开源物性库见 CoolProp \protect\cite{Bell2014CoolProp}；
+高精度工程物性可参考 NIST REFPROP \protect\cite{REFPROP10}。 \\
+\bottomrule
+\end{tabularx}
+\endgroup
+
+\subsection{选型建议}
+\label{subsec:phase-change-model-selection}
+
+若目标是工程液冷或相变热管理，优先用 OpenFOAM/FVM 承担 VOF、能量和沸腾/冷凝
+闭式模型；sonicSolver 侧优先沉淀 Level Set 几何、曲率、法向和高阶界面差分。
+若目标是研究 sharp-interface 相变，则推荐路线是：
+\[
+  \text{非相变 Level Set/GFM}
+  \rightarrow \text{热方程和界面热通量}
+  \rightarrow \text{Stefan 条件}
+  \rightarrow \text{HKS 或壁面沸腾模型}.
+\]
+对任何模型，论文和代码中都应同时记录质量源、潜热源和界面速度符号约定；不要只
+加入质量源而让能量方程隐式吸收误差。
+
+\begin{thebibliography}{99}
+
+\bibitem{AndersonMcFaddenWheeler1998}
+D.~M. Anderson, G.~B. McFadden, and A.~A. Wheeler.
+\newblock Diffuse-interface methods in fluid mechanics.
+\newblock {\em Annual Review of Fluid Mechanics}, 30:139--165, 1998.
+
+\bibitem{Bell2014CoolProp}
+Ian~H. Bell, Jorrit Wronski, Sylvain Quoilin, and Vincent Lemort.
+\newblock Pure and pseudo-pure fluid thermophysical property evaluation and the
+  open-source thermophysical property library {CoolProp}.
+\newblock {\em Industrial \& Engineering Chemistry Research}, 53(6):2498--2508,
+  2014.
+
+\bibitem{BrentVollerReid1988}
+A.~D. Brent, V.~R. Voller, and K.~J. Reid.
+\newblock Enthalpy-porosity technique for modeling convection-diffusion phase
+  change: Application to the melting of a pure metal.
+\newblock {\em Numerical Heat Transfer}, 13(3):297--318, 1988.
+
+\bibitem{CahnHilliard1958}
+John~W. Cahn and John~E. Hilliard.
+\newblock Free energy of a nonuniform system. I. Interfacial free energy.
+\newblock {\em The Journal of Chemical Physics}, 28(2):258--267, 1958.
+
+\bibitem{Crank1984}
+John Crank.
+\newblock {\em Free and Moving Boundary Problems}.
+\newblock Clarendon Press, Oxford, 1984.
+
+\bibitem{HardtWondra2008}
+Steffen Hardt and Florian Wondra.
+\newblock Evaporation model for interfacial flows based on a continuum-field
+  representation of the source terms.
+\newblock {\em Journal of Computational Physics}, 227(11):5871--5895, 2008.
+
+\bibitem{IAPWSIF97}
+{International Association for the Properties of Water and Steam}.
+\newblock Revised release on the {IAPWS} industrial formulation 1997 for the
+  thermodynamic properties of water and steam.
+\newblock \url{https://iapws.org/relguide/IF97-Rev.html}, 2012.
+\newblock IAPWS release.
+
+\bibitem{Kunz2000}
+R.~F. Kunz, D.~A. Boger, D.~R. Stinebring, T.~S. Chyczewski, J.~W. Lindau,
+  H.~J. Gibeling, S.~Venkateswaran, and T.~R. Govindan.
+\newblock A preconditioned Navier-Stokes method for two-phase flows with
+  application to cavitation prediction.
+\newblock {\em Computers \& Fluids}, 29(8):849--875, 2000.
+
+\bibitem{KurulPodowski1990}
+N.~Kurul and M.~Z. Podowski.
+\newblock Multidimensional effects in forced convection subcooled boiling.
+\newblock In {\em Proceedings of the Ninth International Heat Transfer
+  Conference}, pages 21--26, Jerusalem, 1990.
+
+\bibitem{Lee1980}
+W.~H. Lee.
+\newblock A pressure iteration scheme for two-phase flow modeling.
+\newblock In T.~N. Veziroglu, editor, {\em Multiphase Transport: Fundamentals,
+  Reactor Safety, Applications}. Hemisphere Publishing, Washington, DC, 1980.
+\newblock Commonly cited source for Lee-type evaporation/condensation
+  relaxation models.
+
+\bibitem{REFPROP10}
+E.~W. Lemmon, I.~H. Bell, M.~L. Huber, and M.~O. McLinden.
+\newblock {NIST} standard reference database 23: Reference fluid thermodynamic
+  and transport properties -- {REFPROP}, version 10.0.
+\newblock \url{https://www.nist.gov/srd/refprop}, 2018.
+
+\bibitem{SchnerrSauer2001}
+G.~H. Schnerr and J.~Sauer.
+\newblock Physical and numerical modeling of unsteady cavitation dynamics.
+\newblock In {\em Proceedings of the Fourth International Conference on
+  Multiphase Flow}, New Orleans, Louisiana, 2001.
+
+\bibitem{Schrage1953}
+Robert~W. Schrage.
+\newblock {\em A Theoretical Study of Interphase Mass Transfer}.
+\newblock Columbia University Press, New York, 1953.
+
+\bibitem{VollerPrakash1987}
+V.~R. Voller and C.~Prakash.
+\newblock A fixed grid numerical modelling methodology for convection-diffusion
+  mushy region phase-change problems.
+\newblock {\em International Journal of Heat and Mass Transfer},
+  30(8):1709--1719, 1987.
+
+\bibitem{ZwartGerberBelamri2004}
+P.~J. Zwart, A.~G. Gerber, and T.~Belamri.
+\newblock A two-phase flow model for predicting cavitation dynamics.
+\newblock In {\em Proceedings of the Fifth International Conference on
+  Multiphase Flow}, Yokohama, Japan, 2004.
+
+\end{thebibliography}
+
+\end{document}

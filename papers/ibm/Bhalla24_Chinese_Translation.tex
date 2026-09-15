@@ -1,0 +1,898 @@
+\documentclass[UTF8,11pt,a4paper]{ctexart}
+\usepackage{amsmath,amssymb,bm,mathtools}
+\usepackage{graphicx}
+\usepackage{geometry}
+\usepackage{enumitem}
+\usepackage{booktabs,array,longtable}
+\usepackage{caption}
+\usepackage{float}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{microtype}
+\geometry{left=2.25cm,right=2.25cm,top=2.25cm,bottom=2.35cm}
+\hypersetup{colorlinks=true,linkcolor=black,citecolor=black,urlcolor=blue}
+\setlength{\parindent}{2em}
+\setlength{\parskip}{0.25em}
+\setlength{\abovedisplayskip}{7pt}
+\setlength{\belowdisplayskip}{7pt}
+\setlist{nosep}
+\newcommand{\jump}[1]{[\![#1]\!]}
+\newcommand{\dd}{\,\mathrm{d}}
+\newcommand{\D}{\mathrm{D}}
+\newcommand{\R}{\mathbb{R}}
+\newenvironment{algbox}[1]{%
+  \par\medskip\noindent\textbf{#1}\par\smallskip\hrule\smallskip
+  \begin{enumerate}[leftmargin=2.2em,label=\arabic*.]\small
+}{%
+  \end{enumerate}\smallskip\hrule\par\medskip
+}
+\captionsetup{font=small,labelfont=bf}
+
+\title{耦合流固运动中浸没体方法的统一约束表述：\\连续方程与数值算法}
+\author{Amneet Pal Singh Bhalla$^{a,*}$，Neelesh A. Patankar$^{b,*}$\\[0.4em]
+\small $^a$圣迭戈州立大学机械工程系，美国加利福尼亚州圣迭戈\\
+\small $^b$西北大学机械工程系，美国伊利诺伊州埃文斯顿}
+\date{原文：arXiv:2402.15161v1，2024年2月23日\\中文翻译与 \LaTeX{} 排版}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+继 Peskin 及其合作者在浸没边界法（immersed boundary method, IBM）、Glowinski 及其合作者在虚拟域法（fictitious domain method, FDM）以及其他相关方法方面的开创性工作之后，对流体中运动浸没固体的数值模拟如今已成为常规手段。文献中已经提出了大量 IBM 和 FDM 的变体，其中多数方法使用背景网格求解流体方程，并使用拉格朗日点追踪固体。它们共同的核心思想是：把整个流体--固体计算域都视作流体，然后通过约束使固体区域内的流体按照固体控制方程所规定的运动方式运动。浸没固体既可以是刚体，也可以发生变形。因此，这些方法都把流体域延拓到了固体域中。本文从数学角度综述多种浸没方法：首先把流体控制方程改写为扩展域形式，再利用固体方程对延拓进固体区域的流体施加适当约束。由此得到一组扩展域约束型流固控制方程，为多种浸没体技术提供统一框架。强形式下的统一约束控制方程与时间、空间离散方法无关。本文进一步说明，不同的时间推进和空间离散选择会导出文献中不同的计算方法，其适用对象从自由运动刚体一直到弹性自推进物体。这些方法可用于水生运动、潜航器、汽车空气动力学、器官生理流动（如心脏流、食管输运、呼吸流）、波浪能转换器等广泛问题。最后，本文讨论尚待解决的挑战与未来研究方向。
+\end{abstract}
+
+\noindent\textbf{关键词：}流固耦合；虚拟域法；分布式拉格朗日乘子；浸没边界法
+
+\tableofcontents
+\newpage
+
+\section{引言}
+
+虚拟域法（FDM）最早由 Saul'ev 于 1963 年提出，用于在规则网格上求解扩散方程\,[1]。20 世纪 70 年代出现了类似的“区域嵌入方法”（domain imbedding methods），其思想是把真实计算区域嵌入一个规则区域中\,[2]。浸没边界法（IBM）则源自 Peskin 的早期工作\,[3]，现已成为模拟流固耦合（fluid--structure interaction, FSI）的常用方法。Verzicco 最近的 IBM 综述\,[4]指出，IBM 在 20 世纪 70 年代开始为人所知，并在 21 世纪初得到更广泛应用，但其基本组成在 20 世纪 60 年代末至 70 年代初已经形成。与此同时，FDM 被用于偏微分方程\,[5]；20 世纪 90 年代，Glowinski 等人提出了用于 Dirichlet 边界条件的分布式拉格朗日乘子（distributed Lagrange multiplier, DLM）虚拟域方法。约在 2000 年前后，他们又将 DLM 扩展到刚性颗粒流\,[6,7]。进入 21 世纪后，DLM 又被扩展到游动问题\,[8]和布朗系统\,[9,10]。本文把上述所有通过“将流体域延拓至固体域”实现的算法及其变体统称为\textbf{浸没体（immersed body, IB）方法}。\footnote{某些 IBM 在求解控制方程时会排除固体域内的网格点，或把这些网格点上的解置零。由于这类方法不属于虚拟域/扩展域范畴，本文不讨论它们。}
+
+过去二十年中，IB 领域快速发展，并形成了多篇优秀综述。Peskin（2002）\,[11]以及 Griffith 和 Patankar（2020）\,[12]讨论了 IBM 在生物流固耦合问题中的应用，例如心血管流动和食管输运。Mittal 和 Iaccarino 在 2005 年的综述\,[13]中讨论了刚体绕流中的 IBM。Verzicco 2023 年的综述\,[4]则聚焦于湍流计算中的壁面建模。前两篇综述主要讨论半连续 IBM，而后两篇更多讨论完全离散的 IBM，例如直接强迫或速度重构方法。这些工作为 IBM 提供了很好的入门介绍，并给出了针对具体问题选择合适 IB 方法的一般原则。然而，不同 IB 方法本质上都是扩展流体域实现，因此仍有必要用一套共同的控制方程把它们统一起来。本文正是从统一数学视角弥补这一空缺。
+
+既往关于浸没边界法的介绍与综述，往往从连续运动方程的数值近似出发讨论浸没实现。与此不同，本文聚焦于扩展域控制方程的\textbf{强形式}。这里所说的数值近似，包括用 delta 函数进行插值与扩散、时间推进格式、速度重构、以及仅适用于时变问题的算子分裂技术等。强形式按定义是在空间域中逐点成立，而不是以平均或积分意义成立。后者会把一个数值长度尺度引入连续方程，使方程从完全连续变为半连续。强形式既适用于稳态流动（零 Reynolds 数），也适用于非稳态流动（中高 Reynolds 数），并不依赖任何特定数值处理。对这套强形式方程选择特定的时间推进和空间离散，即可得到不同 IBM。因此，本文从理论层面帮助理解 IBM，并说明各种 IBM 其实都受同一套明确定义的方程控制，从而可以在统一框架下进行分析和比较。
+
+本文结构如下。第 2 节推导“真实”流体和固体，以及真实固体内部虚拟（“假”）流体的强形式方程，并统称为虚拟域/扩展域方程。第 3 节说明，不同的时间推进与空间离散选择如何导出不同 IB 算法，包括 Peskin 原始 IBM、浸没有限元法、速度强迫/直接强迫法、用于刚体和自推进物体的虚拟域法（FDM）或分布式拉格朗日乘子法（DLM）、Brinkman/体积惩罚法、浸没界面法以及完全隐式 DLM 方法。第 4 节概述用于三相（气--液--固）FSI 的若干 FDM 算法。第 5 节则讨论文献中 IB 方法的一些关键问题和改进，包括拉格朗日乘子的尖锐实现、高密度比流动稳定化、平滑水动力与约束力的计算、浸没表面上的 Neumann 与 Robin 边界条件、利用单侧 IB 核抑制流体“泄漏”，以及稠密颗粒流窄间隙导致的数值问题。
+
+\section{统一约束表述}
+
+考虑图 1 所示的流体域 $\Omega_f(t)$，其中有固体完全浸没于流体中。所有固体所占区域统记为 $\Omega_s(t)$。把流体和固体都视为连续介质，其质量与动量守恒方程为
+\begin{align}
+\rho_f\frac{\D\bm u_f}{\D t} &= \nabla\cdot\bm\sigma_f && \text{于 }\Omega_f(t), \tag{1}\\
+\rho_s\frac{\D\bm u_s}{\D t} &= \nabla\cdot\bm\sigma_s+\bm f_b+\Delta\rho\,\bm g && \text{于 }\Omega_s(t), \tag{2}\\
+\nabla\cdot\bm u_f &=0\quad\text{于 }\Omega_f(t),\qquad
+\nabla\cdot\bm u_s=0\quad\text{于 }\Omega_s(t), \tag{3}\\
+\bm u_f&=\bm u_s && \text{于 }\partial\Omega_s(t), \tag{4}\\
+\left[\bm\sigma_f^{+}-\bm\sigma_s^{-}\right]\cdot\hat{\bm n}
+&=-\bm F_s && \text{于 }\partial\Omega_s(t). \tag{5}
+\end{align}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.48\textwidth]{figs/fig1.png}
+\caption{流固耦合系统示意图。计算域边界 $\partial\Omega$ 由黑色实线标出；粉色区域为流体域 $\Omega_f$，蓝色区域为固体域 $\Omega_s$，固体边界 $\partial\Omega_s$ 为蓝色实线。浅灰色区域表示用于推导式（5）应力跳跃条件的代表性薄控制体（pillbox）。固体表面单位法向 $\hat{\bm n}$ 指向流体一侧。}
+\end{figure}
+
+其中，$\rho_f$ 和 $\rho_s$ 分别为流体与固体密度，$\bm u_f$ 和 $\bm u_s$ 分别为流体与固体速度场，$\bm\sigma_f$ 和 $\bm\sigma_s$ 分别为流体与固体应力，$\bm f_b$ 是固体中除重力外的体力，$\Delta\rho=\rho_s-\rho_f$，$\bm g$ 为重力加速度，$\D(\,)/\D t$ 表示物质导数。上标“$+$”表示界面流体侧的值，上标“$-$”表示界面固体侧的值。本文假设流体和固体均不可压。注意压力已包含在应力张量中。为便于表述，本文从流体压力中减去了重力引起的静水压力，并假设流体中不存在其他体力。式（4）和式（5）分别表示流固界面的无滑移条件和应力跳跃条件。$\bm F_s$ 为外部表面力密度（即单位面积上的力），$\hat{\bm n}$ 为固体表面指向外侧的法向。除此之外，整个区域 $\Omega$ 的边界还需要给定速度的 Dirichlet 型边界条件\footnote{也可以在计算域的部分边界上考虑牵引力或自然边界条件，这会在弱形式中引入额外项，但强形式方程保持不变。本文采用 Dirichlet 边界条件只是为了简化强形式推导。}，并需要给定流体和固体速度的初始条件，这里不再逐一列出。
+
+式（1）--（5）是流体域和固体域中的强形式方程。利用界面条件后，相应的组合弱形式可写为
+\begin{align}
+&\int_{\Omega_f}\rho_f\frac{\D\bm u_f}{\D t}\cdot\bm v_f\dd V
++\int_{\Omega_f}\bm\sigma_f:\bm D(\bm v_f)\dd V
+-\int_{\Omega_f}q_f\nabla\cdot\bm u_f\dd V \nonumber\\
+&\quad+\int_{\Omega_s}\rho_s\frac{\D\bm u_s}{\D t}\cdot\bm v_s\dd V
++\int_{\Omega_s}\bm\sigma_s:\bm D(\bm v_s)\dd V
+-\int_{\Omega_s}q_s\nabla\cdot\bm u_s\dd V \nonumber\\
+&\quad-\int_{\Omega_s}(\bm f_b+\Delta\rho\,\bm g)\cdot\bm v_s\dd V
+-\int_{\partial\Omega_s}\bm v_s\cdot\bm F_s\dd S=0, \nonumber\\[-0.2em]
+&\hspace{3em}\forall\,\bm v_f\in S_{fv},\ \forall\,\bm v_s\in S_{sv},\ \forall\,q_f\in L^2(\Omega_f(t)),\ \forall\,q_s\in L^2(\Omega_s(t)). \tag{6}
+\end{align}
+这里，$\bm v_f$ 是 $\bm u_f$ 的变分，$\bm v_s$ 是 $\bm u_s$ 的变分，$q_f/q_s$ 分别为压力 $p_f/p_s$ 的变分（压力包含于应力项内）。算子 $\bm D$ 对任意向量 $\bm u$ 定义为
+\[
+\bm D(\bm u)=\frac12\left(\nabla\bm u+\nabla\bm u^{T}\right).
+\]
+压力的解空间与其变分空间相同。速度 $\bm u_f,\bm u_s$ 的解空间 $S_f,S_s$，以及 $\bm v_f,\bm v_s$ 的变分空间 $S_{fv},S_{sv}$ 为
+\begin{align}
+S_f&=\{\bm u_f\mid \bm u_f\in H^1(\Omega_f(t))^3,\ \bm u_f=\bm u_{\partial\Omega}\text{ 于 }\partial\Omega,\ \bm u_f=\bm u_s\text{ 于 }\partial\Omega_s(t)\}, \tag{7}\\
+S_s&=\{\bm u_s\mid \bm u_s\in H^1(\Omega_s(t))^3,\ \bm u_s=\bm u_f\text{ 于 }\partial\Omega_s(t)\}, \tag{8}\\
+S_{fv}&=\{\bm v_f\mid \bm v_f\in H^1(\Omega_f(t))^3,\ \bm v_f=0\text{ 于 }\partial\Omega,\ \bm v_f=\bm v_s\text{ 于 }\partial\Omega_s(t)\}, \tag{9}\\
+S_{sv}&=\{\bm v_s\mid \bm v_s\in H^1(\Omega_s(t))^3,\ \bm v_s=\bm v_f\text{ 于 }\partial\Omega_s(t)\}. \tag{10}
+\end{align}
+
+所有浸没方法的关键特征，都是把流体方程延拓到固体域中。这样做的动机很直接：可以在整个流体--固体区域上求解流体方程，而不必处理不断变化的真实流体域及其几何追踪。固体域内部额外求解的流体方程是冗余的，因此不能改变原始流固运动的物理解。于是，延拓到固体域中的流体方程必须满足这样一个要求：流固界面 $\partial\Omega_s(t)$ 上的速度应当由真实流固运动解“已知”。在弱形式中，可通过把流体方程扩展到固体域来做到这一点：
+\begin{align}
+\int_{\Omega_s}\rho_f\frac{\D\bm u_f}{\D t}\cdot\bm v_e\dd V
++\int_{\Omega_s}\bm\sigma_f:\bm D(\bm v_e)\dd V
+-\int_{\Omega_s}q_f\nabla\cdot\bm u_f\dd V=0,
+\quad \forall\,\bm v_e=\bm v_f-\bm v_s,\ \forall q_f\in L^2(\Omega_s(t)). \tag{11}
+\end{align}
+其中，$\bm v_e$ 是延拓到固体域中的流体速度 $\bm u_f$ 的变分。要求 $\bm v_e\in H^1(\Omega_s(t))^3$ 且 $\bm v_e=0$ 于 $\partial\Omega_s(t)$；后者是因为延拓流体速度在流固界面上必须等于前述“已知”速度。不失一般性，可取 $\bm v_e=\bm v_f-\bm v_s$，其中 $\bm v_f$ 是扩展流体速度场的变分。这个选择满足 $\bm v_e$ 的所有要求。考虑扩展域后，$\bm u_f$ 和 $\bm v_f$ 的空间将在下文正式给出。
+
+将式（6）和式（11）合并，得到扩展域控制方程的弱形式：
+\begin{align}
+&\int_{\Omega}\rho_f\frac{\D\bm u_f}{\D t}\cdot\bm v_f\dd V
++\int_{\Omega}\bm\sigma_f:\bm D(\bm v_f)\dd V
+-\int_{\Omega}q_f\nabla\cdot\bm u_f\dd V \nonumber\\
+&\quad+\int_{\Omega_s}\left(\rho_s\frac{\D\bm u_s}{\D t}-\rho_f\frac{\D\bm u_f}{\D t}\right)\cdot\bm v_s\dd V
++\int_{\Omega_s}\Delta\bm\sigma:\bm D(\bm v_s)\dd V
+-\int_{\Omega_s}q_s\nabla\cdot\bm u_s\dd V \nonumber\\
+&\quad-\int_{\Omega_s}(\bm f_b+\Delta\rho\,\bm g)\cdot\bm v_s\dd V
+-\int_{\partial\Omega_s}\bm v_s\cdot\bm F_s\dd S=0,\nonumber\\[-0.2em]
+&\hspace{3em}\forall\bm v_f\in S_{ev},\ \forall\bm v_s\in S_{sv},\ \forall q_f\in L^2(\Omega),\ \forall q_s\in L^2(\Omega_s(t)), \tag{12}
+\end{align}
+其中 $\Delta\bm\sigma=\bm\sigma_s-\bm\sigma_f$，并使用了 $\bm v_e=\bm v_f-\bm v_s$。扩展流体速度 $\bm u_f$ 的解空间 $S_e$ 和其变分 $\bm v_f$ 的空间 $S_{ev}$ 为
+\begin{align}
+S_e&=\{\bm u_f\mid \bm u_f\in H^1(\Omega)^3,\ \bm u_f=\bm u_{\partial\Omega}\text{ 于 }\partial\Omega,\ \bm u_f=\bm u_s\text{ 于 }\partial\Omega_s(t)\}, \tag{13}\\
+S_{ev}&=\{\bm v_f\mid \bm v_f\in H^1(\Omega)^3,\ \bm v_f=0\text{ 于 }\partial\Omega,\ \bm v_f=\bm v_s\text{ 于 }\partial\Omega_s(t)\}. \tag{14}
+\end{align}
+
+下一步是放松速度解空间和变分空间中 $\bm u_f=\bm u_s$ 与 $\bm v_f=\bm v_s$（在 $\partial\Omega_s(t)$ 上）的约束，同时把相应速度约束显式加入控制方程，并引入对应的拉格朗日乘子。实现方式并不唯一。下面介绍两种具体形式，分别称为\textbf{体力形式}和\textbf{应力形式}。
+
+\subsection{体力形式}
+
+扩展流体域表述必须至少施加界面约束 $\bm u_f=\bm u_s$ 于 $\partial\Omega_s(t)$，此时扩展流体速度与固体速度只需在流固界面相等。另一种同样合理的选择，是要求扩展流体速度在\textbf{整个固体域}（含流固界面）内都等于固体速度。本文把后者记为在 $B(t)$ 上施加 $\bm u_f=\bm u_s$，其中 $B(t)$ 表示包含流固界面的整个固体域。弱形式可写为
+\begin{align}
+\int_{\partial\Omega_s}(\bm u_s-\bm u_f)\cdot\bm\Psi_s\dd S
++\int_{\Omega_s}(\bm u_s-\bm u_f)\cdot\bm\psi_b\dd V=0,
+\quad \forall\bm\Psi_s\in L^2(\partial\Omega_s(t))^3,\ \forall\bm\psi_b\in L^2(\Omega_s(t))^3. \tag{15}
+\end{align}
+如果只要求 $\bm u_f=\bm u_s$ 于 $\partial\Omega_s(t)$，则式（15）中仅保留第一个积分，第二个体积积分不存在。换言之，第一个积分是必需的，而第二个积分可以选择是否使用。
+
+还必须在动量方程的弱形式中加入与上述约束对应的分布式拉格朗日乘子项。于是，扩展域弱形式式（12）、约束式（15）及相应乘子项共同组成
+\begin{align}
+&\int_{\Omega}\rho_f\frac{\D\bm u_f}{\D t}\cdot\bm v_f\dd V
++\int_{\Omega}\bm\sigma_f:\bm D(\bm v_f)\dd V
+-\int_{\Omega}q_f\nabla\cdot\bm u_f\dd V \nonumber\\
+&+\int_{\Omega_s}\left(\rho_s\frac{\D\bm u_s}{\D t}-\rho_f\frac{\D\bm u_f}{\D t}\right)\cdot\bm v_s\dd V
++\int_{\Omega_s}\Delta\bm\sigma:\bm D(\bm v_s)\dd V
+-\int_{\Omega_s}q_s\nabla\cdot\bm u_s\dd V \nonumber\\
+&+\int_{\partial\Omega_s}(\bm u_s-\bm u_f)\cdot\bm\Psi_s\dd S
++\int_{\Omega_s}(\bm u_s-\bm u_f)\cdot\bm\psi_b\dd V \\[-0.3em]
+&+\int_{\partial\Omega_s}(\bm v_s-\bm v_f)\cdot\bm\Lambda_s\dd S
++\int_{\Omega_s}(\bm v_s-\bm v_f)\cdot\bm\lambda_b\dd V
+-\int_{\Omega_s}(\bm f_b+\Delta\rho\,\bm g)\cdot\bm v_s\dd V
+-\int_{\partial\Omega_s}\bm v_s\cdot\bm F_s\dd S=0, \nonumber\\[-0.2em]
+&\forall\bm v_f\in S_{ev0},\ \forall\bm v_s\in H^1(\Omega_s(t))^3,\ \forall q_f\in L^2(\Omega),\ \forall q_s\in L^2(\Omega_s(t)),\nonumber\\
+&\forall\bm\Psi_s\in L^2(\partial\Omega_s(t))^3,\ \forall\bm\psi_b\in L^2(\Omega_s(t))^3. \tag{16}
+\end{align}
+其中 $\bm u_s\in H^1(\Omega_s(t))^3$。$\bm\Lambda_s\in L^2(\partial\Omega_s(t))^3$ 是与式（15）第一个积分（必要的表面约束）对应的分布式拉格朗日乘子；$\bm\lambda_b\in L^2(\Omega_s(t))^3$ 是与第二个积分对应的分布式拉格朗日乘子。后文将看到，$\bm\Lambda_s$ 的物理量纲表现为流固界面上的单位面积力，而 $\bm\lambda_b$ 表现为固体域内的单位体积力。新的流体速度解空间 $S_{e0}$ 与变分空间 $S_{ev0}$ 为
+\begin{align}
+S_{e0}&=\{\bm u_f\mid \bm u_f\in H^1(\Omega)^3,\ \bm u_f=\bm u_{\partial\Omega}\text{ 于 }\partial\Omega\}, \tag{17}\\
+S_{ev0}&=\{\bm v_f\mid \bm v_f\in H^1(\Omega)^3,\ \bm v_f=0\text{ 于 }\partial\Omega\}. \tag{18}
+\end{align}
+
+对式（16）应用 Gauss 定理，可写成
+\begin{align}
+&\int_{\Omega}\left(\rho_f\frac{\D\bm u_f}{\D t}-\nabla\cdot\bm\sigma_f-\bm\Lambda_s\delta_s-\bm\lambda_b\right)\cdot\bm v_f\dd V \nonumber\\
+&+\int_{\Omega_s}\left(\rho_s\frac{\D\bm u_s}{\D t}-\rho_f\frac{\D\bm u_f}{\D t}-\nabla\cdot\Delta\bm\sigma-\bm f_b-\Delta\rho\,\bm g+\bm\lambda_b\right)\cdot\bm v_s\dd V \nonumber\\
+&-\int_{\Omega}q_f\nabla\cdot\bm u_f\dd V-\int_{\Omega_s}q_s\nabla\cdot\bm u_s\dd V
++\int_{\partial\Omega_s}(\bm u_s-\bm u_f)\cdot\bm\Psi_s\dd S
++\int_{\Omega_s}(\bm u_s-\bm u_f)\cdot\bm\psi_b\dd V \nonumber\\
+&+\int_{\partial\Omega_s}\bm v_s\cdot(\Delta\bm\sigma\cdot\hat{\bm n}+\bm\Lambda_s-\bm F_s)\dd S=0, \nonumber\\[-0.2em]
+&\forall\bm v_f\in S_{ev0},\ \forall\bm v_s\in H^1(\Omega_s(t))^3,\ \forall q_f\in L^2(\Omega),\ \forall q_s\in L^2(\Omega_s(t)),\nonumber\\
+&\forall\bm\Psi_s\in L^2(\partial\Omega_s(t))^3,\ \forall\bm\psi_b\in L^2(\Omega_s(t))^3. \tag{19}
+\end{align}
+其中 $\delta_s$ 为表面 delta 函数，只在 $\partial\Omega_s(t)$ 上非零。因此得到如下扩展域强形式：
+\begin{align}
+\rho_f\frac{\D\bm u_f}{\D t}&=\nabla\cdot\bm\sigma_f+\bm\Lambda_s\delta_s+\bm\lambda_b &&\text{于 }\Omega, \tag{20}\\
+\rho_s\frac{\D\bm u_s}{\D t}-\rho_f\frac{\D\bm u_f}{\D t}
+&=\nabla\cdot\Delta\bm\sigma+\bm f_b+\Delta\rho\,\bm g-\bm\lambda_b &&\text{于 }\Omega_s(t), \tag{21}\\
+\nabla\cdot\bm u_f&=0\text{ 于 }\Omega,\qquad \nabla\cdot\bm u_s=0\text{ 于 }\Omega_s(t), \tag{22}\\
+\bm u_f&=\bm u_s &&\text{于 }B(t), \tag{23}\\
+\Delta\bm\sigma\cdot\hat{\bm n}
+=\left[\bm\sigma_s^{-}-\bm\sigma_f^{-}\right]\cdot\hat{\bm n}
+&=\bm F_s-\bm\Lambda_s &&\text{于 }\partial\Omega_s(t). \tag{24}
+\end{align}
+
+式（20）是延拓到整个计算域后的流体动量方程。$\bm\Lambda_s$ 和 $\bm\lambda_b$ 分别只在流固界面和固体域内非零，它们源于式（23）的运动约束，即要求固体区域内的扩展流体随固体运动。更具体地说，$\bm\Lambda_s$（单位面积上的力）由界面约束 $\bm u_f=\bm u_s$ 于 $\partial\Omega_s(t)$ 产生，因此在形式上正确的表述中始终都应存在；$\bm\lambda_b$（单位体积上的力）只有在整个固体域都施加 $\bm u_f=\bm u_s$ 时才出现。如果只在 $\partial\Omega_s(t)$ 上施加约束，则 $\bm\lambda_b=0$。无论是只约束界面还是约束整个 $B(t)$，固体外部真实流体速度和真实固体速度都会得到同一个正确解；两种情况下只有固体内部的扩展流体速度不同，而后者本身并不是我们关心的物理解。
+
+式（21）是固体域中的动量修正方程。换句话说，在 $\Omega_s(t)$ 内把式（20）与式（21）相加，就恢复固体真实动量方程式（2）。式（24）则作为式（21）的边界条件。其含义可以通过一个零厚度薄控制体说明：在流固界面任意位置对式（20）积分，可得
+\begin{equation}
+\left[\bm\sigma_f^{+}-\bm\sigma_f^{-}\right]\cdot\hat{\bm n}=-\bm\Lambda_s
+\qquad\text{于 }\partial\Omega_s(t). \tag{25}
+\end{equation}
+这表明表面力密度 $\bm\Lambda_s\delta_s$ 会在流固界面造成流体应力的跃变。用式（25）减去式（24），就得到原问题强形式中的应力跳跃条件式（5）。最后，式（22）的不可压约束决定了流体和固体压力（均包含在应力项中）。
+
+式（20）--（24）构成流固方程扩展域约束表述的体力形式。它们虽然形式上不同于原始强形式式（1）--（5），但两者等价；差异仅来自把流体延拓进了固体域。对式（20）--（24）采用不同数值求解顺序，就可得到文献中称作 IBM、FDM 等的不同算法。
+
+\subsection{应力形式}
+
+式（15）的约束也可以使用不同内积施加，从而导出不同表述。下面的内积选择给出本文所谓的应力形式：
+\begin{align}
+\int_{\partial\Omega_s}(\bm u_s-\bm u_f)\cdot\bm\Psi_s\dd S
+-\int_{\Omega_s}\bm D(\bm u_s-\bm u_f):\bm D(\bm\xi_b)\dd V=0,\nonumber\\[-0.2em]
+\forall\bm\Psi_s\in L^2(\partial\Omega_s(t))^3,\qquad \forall\bm\xi_b\in H^1(\Omega_s(t))^3. \tag{26}
+\end{align}
+式（26）在 $B(t)$ 上施加 $\bm u_f=\bm u_s$。这在后面推导强形式后会变得清楚。如前所述，如果只想在 $\partial\Omega_s(t)$ 上施加速度匹配，则去掉第二个积分。只有当约束施加于整个 $B(t)$ 时，体力形式和应力形式才有差别；若只约束界面，两种形式相同。
+
+扩展域弱形式式（12）、约束式（26）及相应拉格朗日乘子项组成
+\begin{align}
+&\int_{\Omega}\rho_f\frac{\D\bm u_f}{\D t}\cdot\bm v_f\dd V
++\int_{\Omega}\bm\sigma_f:\bm D(\bm v_f)\dd V
+-\int_{\Omega}q_f\nabla\cdot\bm u_f\dd V \nonumber\\
+&+\int_{\Omega_s}\left(\rho_s\frac{\D\bm u_s}{\D t}-\rho_f\frac{\D\bm u_f}{\D t}\right)\cdot\bm v_s\dd V
++\int_{\Omega_s}\Delta\bm\sigma:\bm D(\bm v_s)\dd V
+-\int_{\Omega_s}q_s\nabla\cdot\bm u_s\dd V \nonumber\\
+&+\int_{\partial\Omega_s}(\bm u_s-\bm u_f)\cdot\bm\Psi_s\dd S
+-\int_{\Omega_s}\bm D(\bm u_s-\bm u_f):\bm D(\bm\xi_b)\dd V \nonumber\\
+&+\int_{\partial\Omega_s}(\bm v_s-\bm v_f)\cdot\bm\Lambda_s\dd S
+-\int_{\Omega_s}\bm D(\bm v_s-\bm v_f):\bm D(\bm\zeta_b)\dd V \nonumber\\
+&-\int_{\Omega_s}(\bm f_b+\Delta\rho\,\bm g)\cdot\bm v_s\dd V
+-\int_{\partial\Omega_s}\bm v_s\cdot\bm F_s\dd S=0,\nonumber\\[-0.2em]
+&\forall\bm v_f\in S_{ev0},\ \forall\bm v_s\in H^1(\Omega_s(t))^3,\ \forall q_f\in L^2(\Omega),\ \forall q_s\in L^2(\Omega_s(t)),\nonumber\\
+&\forall\bm\Psi_s\in L^2(\partial\Omega_s(t))^3,\ \forall\bm\xi_b\in H^1(\Omega_s(t))^3. \tag{27}
+\end{align}
+其中 $\bm\zeta_b\in H^1(\Omega_s(t))^3$ 是与式（26）第二个积分对应的拉格朗日乘子。其余解空间和变分空间与体力形式相同。和前一节一样，对式（27）应用 Gauss 定理后得到扩展域强形式
+\begin{align}
+\rho_f\frac{\D\bm u_f}{\D t}
+&=\nabla\cdot\bm\sigma_f+\nabla\cdot\bm D(\bm\zeta_b)+\bm\Lambda_s\delta_s &&\text{于 }\Omega, \tag{28}\\
+\rho_s\frac{\D\bm u_s}{\D t}-\rho_f\frac{\D\bm u_f}{\D t}
+&=\nabla\cdot\Delta\bm\sigma+\bm f_b+\Delta\rho\,\bm g-\nabla\cdot\bm D(\bm\zeta_b) &&\text{于 }\Omega_s(t), \tag{29}\\
+\nabla\cdot\bm D(\bm u_f-\bm u_s)&=0 &&\text{于 }\Omega_s(t),\qquad
+\bm D(\bm u_f-\bm u_s)\cdot\hat{\bm n}=0\ \text{于 }\partial\Omega_s(t), \tag{30}\\
+\bm u_f-\bm u_s&=0 &&\text{于 }\partial\Omega_s(t), \tag{31}\\
+\left[\bm\sigma_s^{-}-\bm\sigma_f^{-}-\bm\sigma_{\zeta}^{-}\right]\cdot\hat{\bm n}
+&=\bm F_s-\bm\Lambda_s &&\text{于 }\partial\Omega_s(t), \tag{32}
+\end{align}
+其中 $\bm\sigma_{\zeta}=\bm D(\bm\zeta_b)$，且此处没有重复写出不可压约束式（22）。
+
+式（28）--（32）构成扩展域流固方程的应力形式。与体力形式一样，$\bm\Lambda_s$ 源于界面约束式（31）；但另一个乘子 $\bm\zeta_b$ 的形式与体力形式中的 $\bm\lambda_b$ 不同。$\bm\sigma_{\zeta}=\bm D(\bm\zeta_b)$ 是对应 $\bm\zeta_b$ 的应力场。$\bm\zeta_b$ 源于式（30）的约束，该式保证固体域内扩展流体速度与真实固体速度之间至多相差一个刚体运动；而式（31）又把这个刚体运动约束为零。因此，式（30）和式（31）共同保证在 $B(t)$ 上有 $\bm u_f=\bm u_s$。
+
+同样，在 $\Omega_s(t)$ 中把式（28）和式（29）相加会恢复固体动量方程式（2）。式（32）是式（29）的边界条件。式（28）在流固界面上给出扩展流体应力的跳跃条件
+\begin{equation}
+\left[\bm\sigma_f^{+}-\bm\sigma_f^{-}-\bm\sigma_{\zeta}^{-}\right]\cdot\hat{\bm n}
+=-\bm\Lambda_s\qquad\text{于 }\partial\Omega_s(t). \tag{33}
+\end{equation}
+将式（32）从式（33）中相减，即可恢复原始强形式中的应力跳跃条件式（5）。
+
+\section{求解方法与算法}
+
+已有多类计算方法通过把流体域延拓进固体域来求解流固运动。它们所求的基本控制方程实际上都是上一节所给的统一方程，不同点主要在于这些方程的求解方式。下面以体力形式式（20）--（24）为基础说明这一点。为突出区分不同方法的核心算法思想，这里尽量不引入空间离散；对时间离散也只作最少处理，并在部分地方使用最基本的分数步时间推进（fractional time-stepping, FTS）。实际实现中的离散选择当然十分重要，但不是本节重点。下文方程均默认包含不可压约束，因此不再反复写出。
+
+\subsection{浸没边界法}
+
+Peskin 的浸没边界法\,[11]是模拟流体--弹性体耦合运动最广泛使用的方法之一。原始方法针对浸没于流体中的弹性纤维\,[3]，后来已推广到浸没于流体中的三维弹性连续体\,[14,15]。如果按照特定顺序求解式（20）--（24），就得到经典 IBM。
+
+\begin{algbox}{算法 1：浸没边界法（IMMERSED BOUNDARY METHOD）}
+\item 求解
+\[
+\rho_f\frac{\D\bm u_f}{\D t}=\nabla\cdot\bm\sigma_f+\bm\lambda\qquad\text{于 }\Omega,
+\]
+得到整个计算域中的流体速度 $\bm u_f$。
+\item 在 $B(t)$ 上施加约束 $\bm u_s=\bm u_f$。例如，可使用正则化核函数把 $\bm u_f$ 插值到 $B(t)$。
+\item 计算
+\begin{align*}
+\bm\lambda_b&=-\Delta\rho\frac{\D\bm u_s}{\D t}+\nabla\cdot(\bm\sigma_s-\bm\sigma_f)+\bm f_b+\Delta\rho\,\bm g &&\text{于 }\Omega_s(t),\\
+\bm\Lambda_s&=-\left[\bm\sigma_s^{-}-\bm\sigma_f^{-}\right]\cdot\hat{\bm n}+\bm F_s &&\text{于 }\partial\Omega_s(t),\\
+\bm\lambda&=\bm\Lambda_s\delta_s+\bm\lambda_b,
+\end{align*}
+即更新拉格朗日乘子。
+\item 回到步骤 1。
+\end{algbox}
+
+通常，一个 IBM 时间步按算法 1 所示的三个显式阶段完成。步骤 1 用最新已知的 $\bm\lambda$ 场求解体力形式中的式（20）。实际计算中，$\bm\Lambda_s$ 通常通过离散 delta 函数在流固界面附近数个网格单元内平滑扩散\,[11]，因此整个 $\bm\lambda$ 场在数值上都可视作一个体力项。步骤 2 显式“施加”式（23）的约束，即在固体区域把最新的 $\bm u_f$ 解赋给 $\bm u_s$。这种投影通常也利用离散 delta 函数完成。步骤 3 再利用最新解和固体域动量修正式（21）显式计算 $\bm\lambda_b$，并用固体域边界条件式（24）显式计算 $\bm\Lambda_s$。在实际实现中，因为 $\bm\Lambda_s$ 已经被平滑成体力，它往往不会单独计算，而是包含在式（21）的动量修正中。步骤 3 计算 $\bm\lambda$ 时经常采用近似，最常见的是忽略 $\bm\sigma_f$。另一种简化是把固体假设为黏弹性体而不是纯弹性体，即写成 $\bm\sigma_s=\bm\sigma_e+\bm\sigma_f$，其中 $\bm\sigma_e$ 是纯弹性应力分量；这样在计算 $\bm\lambda$ 时同样可以消去 $\bm\sigma_f$。最新得到的 $\bm\lambda$ 随后进入下一时间步的步骤 1。
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.74\textwidth]{figs/fig2.png}
+\caption{流体中自由运动物体的两个代表性场景：（a）两个刚性球通过连接质心的弹簧执行器相互驱动，从而形成自推进双体系统；（b）自由游动的鱼通过身体局部摆动在水中推进。}
+\end{figure}
+
+这里还值得说明浸没有限元法（immersed finite element method, IFEM）与 Peskin IBM 的相似性。在 Zhang 等\,[16]以及 Zhang 和 Gay\,[17]提出的经典 IFEM 中，变分空间 $\bm v_f$ 与 $\bm v_s$ 取为相同，因此对应的解空间 $\bm u_f$ 与 $\bm u_s$ 也相同。这样会把扩展域弱形式式（12）改写为
+\begin{align}
+&\int_{\Omega}\rho_f\frac{\D\bm u_f}{\D t}\cdot\bm v_f\dd V
++\int_{\Omega}\bm\sigma_f:\bm D(\bm v_f)\dd V
+-\int_{\Omega}q_f\nabla\cdot\bm u_f\dd V \nonumber\\
+&=-\int_{\Omega_s}(\rho_s-\rho_f)\frac{\D\bm u_f}{\D t}\cdot\bm v_f\dd V
+-\int_{\Omega_s}\Delta\bm\sigma:\bm D(\bm v_f)\dd V
++\int_{\Omega_s}(\bm f_b+\Delta\rho\,\bm g)\cdot\bm v_f\dd V
++\int_{\partial\Omega_s}\bm v_f\cdot\bm F_s\dd S,\nonumber\\[-0.2em]
+&\hspace{4em}\forall\bm v_f\in S_{ev},\qquad \forall q_f\in L^2(\Omega). \tag{34}
+\end{align}
+IFEM 通常显式处理式（34）右端，不过也存在对固体域项进行半隐式\,[18,19]和完全隐式\,[20,21]处理的方法。注意，式（34）右端各项在显式 IBM 算法 1 的步骤 3 中整体记作 $\bm\lambda$。因此，算法 1 其实也描述了显式 IFEM。推导浸没表述时把 $\bm v_f$ 和 $\bm v_s$ 分别保留为独立变分空间，有助于明确导出扩展域强形式式（21）；而且第 2 节的表述还允许固体域内虚拟流体速度与真实固体速度不同，这一点比 IFEM 中直接假设两者相同更一般。
+
+\subsection{虚拟域法：刚体与自推进物体}
+
+过去二十多年中，虚拟域法及其变体被广泛用于模拟流体中自由运动刚体\,[22,6,7,23]以及自推进游动物体\,[8,24--31]。图 2 给出了两个代表性例子。下面考虑一个自推进游动物体：其形变运动学预先已知，但整体平移速度和角速度未知。自由运动刚体只是形变运动学为零的特殊情形，因此不再单独讨论。
+
+在继续之前，需要先写出整个固体（刚体或变形体）的运动方程。对体力形式中的固体动量修正式（21）在固体域积分，并利用边界条件式（24），即可得到整体平移动量方程；对线动量方程取力矩并积分，则得到角动量方程：
+\begin{align}
+M_s\frac{\D\bm U_s}{\D t}
+-\frac{\D}{\D t}\left(\int_{\Omega_s}\rho_f\bm u_f\dd V\right)
+&=\Delta M\,\bm g-\int_B\bm\lambda\dd V
++\int_{\partial\Omega_s}\bm F_s\dd S+\int_{\Omega_s}\bm f_b\dd V, \tag{35}\\
+\frac{\D(\bm I_s\cdot\bm\omega_s)}{\D t}
+-\frac{\D}{\D t}\left(\int_{\Omega_s}\bm r\times\rho_f\bm u_f\dd V\right)
+&=-\int_B\bm r\times\bm\lambda\dd V
++\int_{\partial\Omega_s}\bm r\times\bm F_s\dd S
++\int_{\Omega_s}\bm r\times\bm f_b\dd V. \tag{36}
+\end{align}
+其中 $M_s$ 和 $\bm I_s$ 分别为固体质量和转动惯量，$\Delta M=\Delta\rho V_b$，$V_b$ 为固体体积，$\bm r$ 是相对于固体质心的位置向量。固体平均平移速度 $\bm U_s$ 和平均角速度 $\bm\omega_s$ 定义为
+\begin{align}
+M_s\bm U_s&=\int_{\Omega_s}\rho_s\bm u_s\dd V, \tag{37}\\
+\bm I_s\cdot\bm\omega_s&=\int_{\Omega_s}\bm r\times\rho_s\bm u_s\dd V. \tag{38}
+\end{align}
+涉及 $\bm\lambda$ 的积分采用如下记号：
+\begin{align}
+\int_B\bm\lambda\dd V
+&=\int_{\partial\Omega_s}\bm\Lambda_s\dd S+\int_{\Omega_s}\bm\lambda_b\dd V, \tag{39}\\
+\int_B\bm r\times\bm\lambda\dd V
+&=\int_{\partial\Omega_s}\bm r\times\bm\Lambda_s\dd S+\int_{\Omega_s}\bm r\times\bm\lambda_b\dd V. \tag{40}
+\end{align}
+当使用 $B(t)$ 上的速度约束 $\bm u_f=\bm u_s$（式（23））时，可以在式（35）和式（36）中把 $\bm u_f$ 替换为 $\bm u_s$，从而得到
+\begin{align}
+\Delta M_s\frac{\D\bm U_s}{\D t}
+&=-\int_B\bm\lambda\dd V+\int_{\partial\Omega_s}\bm F_s\dd S
++\int_{\Omega_s}\bm f_b\dd V+\Delta M\,\bm g, \tag{41}\\
+\frac{\D(\Delta\bm I_s\cdot\bm\omega_s)}{\D t}
+&=-\int_B\bm r\times\bm\lambda\dd V
++\int_{\partial\Omega_s}\bm r\times\bm F_s\dd S
++\int_{\Omega_s}\bm r\times\bm f_b\dd V, \tag{42}
+\end{align}
+其中 $\Delta\bm I_s$ 是按照密度差 $\Delta\rho$ 定义的转动惯量。对中性浮力物体（对于游动物体通常是合理近似），所有与 $\Delta\rho$ 成正比的惯性项都为零。中性浮力自推进物体的虚拟域法可总结为算法 2。
+
+\begin{algbox}{算法 2：虚拟域法--自推进（FICTITIOUS DOMAIN METHOD: SELF-PROPULSION）}
+\item 联立求解
+\begin{align*}
+\rho_f\frac{\D\bm u_f}{\D t}&=\nabla\cdot\bm\sigma_f+\bm\lambda &&\text{于 }\Omega,\\
+\bm u_f&=\bm U_s+(\bm\omega_s\times\bm r)+\bm u_{s,\mathrm{def}} &&\text{于 }B(t),\\
+\int_B\bm\lambda\dd V&=\int_{\partial\Omega_s}\bm F_s\dd S+\int_{\Omega_s}\bm f_b\dd V,\\
+\int_B\bm r\times\bm\lambda\dd V&=\int_{\partial\Omega_s}\bm r\times\bm F_s\dd S+\int_{\Omega_s}\bm r\times\bm f_b\dd V.
+\end{align*}
+其中 $\bm u_{s,\mathrm{def}}$ 为已知形变运动学。若没有外力，则 $\int_B\bm\lambda\dd V=0$；若没有外力矩，则 $\int_B\bm r\times\bm\lambda\dd V=0$。
+\item 后处理计算
+\begin{align*}
+\bm f_b&=\Delta\rho\frac{\D\bm u_s}{\D t}-\nabla\cdot(\bm\sigma_s-\bm\sigma_f)+\bm\lambda_b-\Delta\rho\,\bm g &&\text{于 }\Omega_s,\\
+\bm F_s&=\left[\bm\sigma_s^{-}-\bm\sigma_f^{-}\right]\cdot\hat{\bm n}+\bm\Lambda_s &&\text{于 }\partial\Omega_s.
+\end{align*}
+$\bm f_b$ 和 $\bm F_s$ 是后处理得到的量。
+\end{algbox}
+
+在自推进 FDM 中，体力形式的流体动量式（20）与速度约束式（23）耦合求解。固体速度写成
+\[
+\bm u_s=\bm U_s+(\bm\omega_s\times\bm r)+\bm u_{s,\mathrm{def}},
+\]
+其中 $\bm u_{s,\mathrm{def}}$ 已知，因此未知量只剩整体刚体分量 $\bm U_s$ 和 $\bm\omega_s$。要解出这两个量，还需要额外两组方程，即式（41）和式（42）。对于中性浮力物体，它们化简为算法 2 中关于 $\bm\lambda$ 积分的约束。式（41）和式（42）本身来自对固体动量修正式（21）及边界条件式（24）的积分。对于图 2(b) 中自由游动的物体，外力和外力矩的总体积分均为零，因此 $\bm F_s$、$\bm f_b$ 的总力和总力矩也为零，最终得到 $\bm\lambda$ 的总积分与力矩积分均为零。相反，对图 2(a) 的双球自推进系统，每个球上的 $\bm\lambda$ 积分并不为零，而等于执行器（弹簧）产生的净力。这些额外约束正好提供求解每一时刻 $\bm U_s$ 与 $\bm\omega_s$ 所需的方程。求得运动后，如果已知固体弹性性质，还可逐点利用式（21）和式（24）反演 $\bm f_b$ 和 $\bm F_s$；算法 2 的步骤 2 就是这个后处理过程，可用于分析固体为了实现给定形变运动学而需要产生怎样的内部和表面力场。
+
+下面简要说明体力形式的 FDM 在数值上如何实现。实际中常采用一阶分数步时间推进（FTS），如算法 3。步骤 1 在整个计算域上求解流体方程；步骤 2 本质上对固体动量修正式（21）和边界条件式（24）做积分求解，从而得到 $\bm U_s$、$\bm\omega_s$ 和 $\bm\lambda$；步骤 3 则通过把中间速度 $\tilde{\bm u}_f$ 直接替换为步骤 2 最新得到的固体速度来施加速度约束，这等价于在流体中加入约束力场 $\bm\lambda$。和 IBM 一样，$\bm\Lambda_s$ 通常通过正则化积分核在流固界面附近若干网格内扩散，因此实际计算中整个 $\bm\lambda$ 场仍被视作体力项。
+
+\begin{algbox}{算法 3：虚拟域法--自推进的一阶 FTS 实现}
+\item 在整个 $\Omega$ 中求解流体动量方程
+\begin{align*}
+\rho_f\frac{\tilde{\bm u}_f-\bm u_f^n}{\Delta t}
++\rho_f(\tilde{\bm u}_f\cdot\nabla)\tilde{\bm u}_f
+&=\nabla\cdot\tilde{\bm\sigma}_f,\\
+\nabla\cdot\tilde{\bm u}_f&=0.
+\end{align*}
+其中“$\tilde{\ }$”表示中间场，上标 $n$ 为时间步编号。
+\item 求解固体刚体速度分量
+\begin{align*}
+\int_B\bm\lambda^{n+1}\dd V&=0\quad\Longrightarrow\quad \bm U_s^{n+1},\\
+\int_B\bm r\times\bm\lambda^{n+1}\dd V&=0\quad\Longrightarrow\quad \bm\omega_s^{n+1},\\
+\bm\lambda^{n+1}&=\rho_f\frac{\bm U_s^{n+1}+(\bm\omega_s^{n+1}\times\bm r)+\bm u_{s,\mathrm{def}}^{n+1}-\tilde{\bm u}_f}{\Delta t},
+\end{align*}
+其中假设无外力和外力矩，$\bm\lambda$ 定义在 $B(t)$ 上。
+\item 在 $B(t)$ 上施加速度约束
+\[
+\rho_f\frac{\bm u_f^{n+1}-\tilde{\bm u}_f}{\Delta t}=\bm\lambda^{n+1},
+\]
+即采用 Chorin 型投影。
+\end{algbox}
+
+\subsection{速度强迫/直接强迫法}
+
+速度强迫方法的基本特征，是把固体区域的速度直接赋给流体，可以只在流固界面上赋值，也可以在整个固体域内赋值。这类技术既可用于固体运动预先已知的情形\,[32]，也可用于求解自由运动刚体\,[33]。为在体力形式式（20）--（24）的统一框架下说明该方法，下面以流体中的自由运动刚体为例。
+
+\begin{algbox}{算法 4：速度强迫法（VELOCITY FORCING METHOD）}
+\item 联立求解流体动量方程和速度约束
+\begin{align*}
+\rho_f\frac{\D\bm u_f}{\D t}&=\nabla\cdot\bm\sigma_f+\bm\lambda &&\text{于 }\Omega,\\
+\bm u_f&=\bm U_s+\bm\omega_s\times\bm r &&\text{于 }\partial\Omega_s(t)\text{ 或 }B(t).
+\end{align*}
+\item 更新刚体速度
+\begin{align*}
+M_s\frac{\D\bm U_s}{\D t}
+&=\frac{\D}{\D t}\left(\int_{\Omega_s}\rho_f\bm u_f\dd V\right)
+-\int_{\Omega_s}\bm\lambda\dd V
++\int_{\partial\Omega_s}\bm F_s\dd S
++\int_{\Omega_s}\bm f_b\dd V+\Delta M\,\bm g,\\
+\frac{\D(\bm I_s\cdot\bm\omega_s)}{\D t}
+&=\frac{\D}{\D t}\left(\int_{\Omega_s}\bm r\times\rho_f\bm u_f\dd V\right)
+-\int_{\Omega_s}\bm r\times\bm\lambda\dd V\\
+&\quad+\int_{\partial\Omega_s}\bm r\times\bm F_s\dd S
++\int_{\Omega_s}\bm r\times\bm f_b\dd V.
+\end{align*}
+其中前两项组合分别给出作用在刚体上的净水动力和净水动力矩。由式（20）和 Gauss 散度定理可验证
+\begin{align*}
+\frac{\D}{\D t}\left(\int_{\Omega_s}\rho_f\bm u_f\dd V\right)-\int_{\Omega_s}\bm\lambda\dd V
+&=\int_{\partial\Omega_s}\bm\sigma_f^{+}\cdot\hat{\bm n}\dd S,\\
+\frac{\D}{\D t}\left(\int_{\Omega_s}\bm r\times\rho_f\bm u_f\dd V\right)-\int_{\Omega_s}\bm r\times\bm\lambda\dd V
+&=\int_{\partial\Omega_s}\bm r\times(\bm\sigma_f^{+}\cdot\hat{\bm n})\dd S.
+\end{align*}
+\item 回到步骤 1。
+\end{algbox}
+
+步骤 1 中，动量式（20）与速度约束式（23）一起求解。以刚体为例，固体速度为 $\bm u_s=\bm U_s+\bm\omega_s\times\bm r$。步骤 2 利用最新的流体速度 $\bm u_f$ 和拉格朗日乘子场 $\bm\lambda$ 显式更新刚体平移与转动速度，即等价于求解体力形式中式（21）和式（24）的积分形式。文献中也经常直接在固体表面从流体侧逐点计算水动力应力并积分，从而获得净水动力和力矩。
+
+速度强迫算法的步骤 1 可以用一阶 FTS，也可以用 Brinkman 惩罚（Brinkman penalization, BP）\,[34--36]，如算法 5 所示。步骤 1(a) 用最新的刚体速度定义拉格朗日乘子场；步骤 1(b) 在整个计算域求解动量方程；只有 FTS 才需要步骤 1(c)，此时在约束位置直接用最新的固体速度替换中间流体速度，相当于显式加入 $\bm\lambda$。若采用 BP，则 $\bm\lambda$ 已在步骤 1(b) 中作为源项加入。文献中采用 FTS、直接用固体速度替换中间速度的方法，通常称作\textbf{直接强迫法}\,[33,37]。
+
+\begin{algbox}{算法 5：速度强迫法的步骤 1 实现}
+\item[(a)] 定义拉格朗日乘子场
+\[
+\bm\lambda^{n+1}=\kappa\left(\bm U_s+(\bm\omega_s\times\bm r)-\tilde{\bm u}_f\right)
+\quad\text{于 }\partial\Omega_s\text{ 或 }B(t),
+\qquad \kappa\approx\frac{\rho_f}{\Delta t}.
+\]
+\item[(b)] 在整个 $\Omega$ 中求解流体动量方程
+\begin{align*}
+\rho_f\frac{\tilde{\bm u}_f-\bm u_f^n}{\Delta t}
++\rho_f(\tilde{\bm u}_f\cdot\nabla)\tilde{\bm u}_f
+&=\nabla\cdot\tilde{\bm\sigma}_f+\theta\bm\lambda^{n+1},\\
+\nabla\cdot\tilde{\bm u}_f&=0,
+\end{align*}
+其中 BP 方法取 $\theta=1$，FTS 取 $\theta=0$。
+\item[(c)] 若 $\theta=0$，则施加
+\[
+\rho_f\frac{\bm u_f^{n+1}-\tilde{\bm u}_f}{\Delta t}=\bm\lambda^{n+1}
+\qquad\text{于 }\partial\Omega_s(t)\text{ 或 }B(t),
+\]
+即 Chorin 型投影。
+\end{algbox}
+
+\subsection{完全隐式方法与布朗运动模拟}
+
+第 3.2 节介绍了自推进物体的虚拟域法及其典型 FTS 实现。FTS 高效，但它只近似满足扩展流体区域中的约束；而且当 Reynolds 数趋于零（稳态 Stokes 极限）时，式（20）和式（21）的惯性项消失，FTS 也就无法工作。这两个问题促使人们采用完全隐式虚拟域算法。此时，需要把流体速度 $\bm u_f$、压力 $p_f$、拉格朗日乘子 $\bm\lambda$ 以及刚体速度 $\bm U_s$、$\bm\omega_s$ 一起作为联立未知量求解。算法 6 针对刚体平移与转动速度预先已知的情况，算法 7 则同时求解刚体速度。
+
+\begin{algbox}{算法 6：完全隐式虚拟域法--给定速度}
+\item 同时求解 $\bm u_f$、$p_f$ 和 $\bm\lambda$：
+\begin{align*}
+\rho_f\frac{\D\bm u_f}{\D t}&=\nabla\cdot\bm\sigma_f+\bm\lambda &&\text{于 }\Omega,\\
+\nabla\cdot\bm u_f&=0,\\
+\bm u_f&=\bm U_s+(\bm\omega_s\times\bm r)+\bm u_{s,\mathrm{def}} &&\text{于 }B(t).
+\end{align*}
+在稳态 Stokes 极限中省略惯性项 $\rho_f\D\bm u_f/\D t$；$p_f$ 是施加不可压约束的拉格朗日乘子，$\bm\lambda$ 是施加 $\bm u_f=\bm u_s$ 约束的拉格朗日乘子。$\bm U_s$、$\bm\omega_s$ 和 $\bm u_{s,\mathrm{def}}$ 均已知。
+\end{algbox}
+
+\begin{algbox}{算法 7：完全隐式虚拟域法--自推进}
+\item 同时求解 $\bm u_f$、$p_f$、$\bm\lambda$、$\bm U_s$ 和 $\bm\omega_s$：
+\begin{align*}
+\rho_f\frac{\D\bm u_f}{\D t}&=\nabla\cdot\bm\sigma_f+\bm\lambda &&\text{于 }\Omega,\\
+\nabla\cdot\bm u_f&=0,\\
+\bm u_f&=\bm U_s+(\bm\omega_s\times\bm r)+\bm u_{s,\mathrm{def}} &&\text{于 }B(t),\\
+\int_B\bm\lambda\dd V&=\int_{\partial\Omega_s}\bm F_s\dd S+\int_{\Omega_s}\bm f_b\dd V,\\
+\int_B\bm r\times\bm\lambda\dd V&=\int_{\partial\Omega_s}\bm r\times\bm F_s\dd S+\int_{\Omega_s}\bm r\times\bm f_b\dd V.
+\end{align*}
+最后两式分别是平移速度 $\bm U_s$ 和转动速度 $\bm\omega_s$ 的约束方程。
+\end{algbox}
+
+算法 6 和算法 7 的完全隐式联立系统，可以使用专门的物理预条件器\,[38,39]，也可以用 SIMPLE/PISO 一类迭代方法\,[24]求解。完全隐式 IB 通常用于过阻尼（Stokes）流动中颗粒布朗运动的模拟\,[9,10,40]。多数中高 Reynolds 数 IB 应用仍采用更高效的 FTS；针对零 Reynolds 数的 IB 工作相对较少\,[38,39]，原因之一就是联立大规模系统的求解非常困难。不过需要强调，体力形式式（20）--（24）本身与 Reynolds 数无关。
+
+分布式拉格朗日乘子法可自然扩展到颗粒布朗运动：把整个流体域视为涨落流体，再约束颗粒域作刚体运动，即会产生浸没颗粒的布朗运动\,[41,9]。短时间尺度的直接布朗计算能够自然再现平移和转动自相关函数正确的代数尾部，而经典 Langevin 方程给出的是指数尾部\,[10]。但有两个问题必须特别注意。第一，要让离散流体方程满足涨落--耗散定理，需要使用具有良好谱性质的空间离散，因此推荐流体变量采用交错网格离散\,[9,10]。第二，在长时间尺度上，要得到正确的颗粒扩散统计，还需要专门的时间积分器，以正确处理颗粒构型变化的影响\,[40]。
+
+\section{多相表述}
+
+第 2 节为便于推导，假设流体密度和固体密度 $\rho_f,\rho_s$ 均为常数，这也与大多数既有文献一致。这个假设可以在弱形式和强形式中放宽，从而同时模拟固体、液体和气体。令 $\rho_f(\bm x,t)$ 表示 $\Omega_f(t)$ 内“可流动”相（例如空气和水）的密度，$\rho_s(\bm x,t)$ 表示 $\Omega_s(t)$ 内固体密度，则多相系统的强形式为
+\begin{align}
+\rho_f(\bm x,t)\frac{\D\bm u_f}{\D t}
+&=\nabla\cdot\bm\sigma_f+\rho_f(\bm x,t)\bm g &&\text{于 }\Omega_f(t), \tag{43}\\
+\rho_s(\bm x,t)\frac{\D\bm u_s}{\D t}
+&=\nabla\cdot\bm\sigma_s+\bm f_b+\rho_s(\bm x,t)\bm g &&\text{于 }\Omega_s(t), \tag{44}\\
+\nabla\cdot\bm u_f&=0\text{ 于 }\Omega_f(t),\qquad \nabla\cdot\bm u_s=0\text{ 于 }\Omega_s(t), \tag{45}\\
+\frac{\D\rho_f(\bm x,t)}{\D t}&=0\text{ 于 }\Omega_f(t),\qquad
+\frac{\D\rho_s(\bm x,t)}{\D t}=0\text{ 于 }\Omega_s(t), \tag{46}\\
+\bm u_f&=\bm u_s &&\text{于 }\partial\Omega_s(t), \tag{47}\\
+\left[\bm\sigma_f^{+}-\bm\sigma_s^{-}\right]\cdot\hat{\bm n}
+&=-\bm F_s &&\text{于 }\partial\Omega_s(t). \tag{48}
+\end{align}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.70\textwidth]{figs/fig3.png}
+\caption{波浪能转换装置在入射水波作用下于气--水界面振荡的示意图。空气域为 $\Omega_{\mathrm{air}}$，水域为 $\Omega_{\mathrm{water}}$，固体为 $\Omega_{\mathrm{solid}}$，可流动相区域 $\Omega_f(t)=\Omega_{\mathrm{air}}(t)\cup\Omega_{\mathrm{water}}(t)$。空气与水密度比约为 1000，空气与固体（机械振子）密度比约为 500。（a）固体感知型气液界面输运：界面只在 $\Omega_f(t)$ 内推进；（b）固体无感型气液界面输运：界面在整个 $\Omega$ 内推进。}
+\end{figure}
+
+这里把重力在可流动相区域 $\Omega_f$ 和固体区域 $\Omega_s$ 中分别写出，是为了处理固体同时部分浸没在不同流体相中的情况。图 3 的波浪能转换器在气--水界面上进行升沉和俯仰振荡就是一个例子。若有需要，流体动量方程中还可以把表面张力和其他力一起写成体力项。式（45）表示体积守恒，而式（46）表示三相的不可压性，并用于追踪各相随时间变化的区域。实际计算中，根据所选技术，这些方程会由不同的界面输运/追踪方程替代；本节后面会在介绍式（43）--（48）的求解算法后讨论界面追踪方法。
+
+按照第 2 节常密度系统的推导步骤，可得到变密度多相系统的扩展域强形式：
+\begin{align}
+\rho_f(\bm x,t)\frac{\D\bm u_f}{\D t}
+&=\nabla\cdot\bm\sigma_f+\rho_f(\bm x,t)\bm g+\bm\Lambda_s\delta_s+\bm\lambda_b &&\text{于 }\Omega, \tag{49}\\
+\rho_s(\bm x,t)\frac{\D\bm u_s}{\D t}
+-\rho_f(\bm x,t)\frac{\D\bm u_f}{\D t}
+&=\nabla\cdot\Delta\bm\sigma+\bm f_b+[\rho_s(\bm x,t)-\rho_f(\bm x,t)]\bm g-\bm\lambda_b &&\text{于 }\Omega_s(t), \tag{50}\\
+\bm u_f&=\bm u_s &&\text{于 }B(t), \tag{51}\\
+\Delta\bm\sigma\cdot\hat{\bm n}
+=\left[\bm\sigma_s^{-}-\bm\sigma_f^{-}\right]\cdot\hat{\bm n}
+&=\bm F_s-\bm\Lambda_s &&\text{于 }\partial\Omega_s(t). \tag{52}
+\end{align}
+下面分别讨论虚拟域法和速度强迫法如何求解这套方程。
+
+\subsection{虚拟域法：多相系统}
+
+令延拓到固体区域中的虚拟流体密度与固体密度匹配，即在 $B(t)$ 上取
+\[
+\rho_f(\bm x,t)=\rho_s(\bm x,t).
+\]
+在这种选择下，变密度多相系统的虚拟域法与算法 3 完全相同，只是流体密度在整个计算域内通常不再是常数，因此必须使用变密度流体求解器，而不能使用可能更快的常密度求解器。虚拟流体密度与固体密度匹配后，式（50）中的惯性修正项和重力差项都消失。Pathak 和 Raessi\,[42]以及 Nangia 等\,[43]正是使用算法 3 来求解多相 FSI 方程。
+
+\subsection{速度强迫法：多相系统}
+
+多相 FSI 中的速度强迫法仍与算法 4 和算法 5 相同，但不要求固体区域内的虚拟流体密度与固体密度一致。因此，可在固体域内选择任意合理的虚拟流体密度。需要注意，由于式（49）增加了重力项，算法 4 中表示净水动力的组合项现在同时包含水动力和重力贡献，即
+\begin{equation}
+\frac{\D}{\D t}\left(\int_{\Omega_s}\rho_f\bm u_f\dd V\right)
+-\int_{\Omega_s}\bm\lambda\dd V
+=\int_{\partial\Omega_s}\bm\sigma_f^{+}\cdot\hat{\bm n}\dd S
++\int_{\Omega_s}\rho_f(\bm x,t)\bm g\dd V. \tag{53}
+\end{equation}
+回忆
+\[
+\Delta M=\int_{\Omega_s}[\rho_s(\bm x,t)-\rho_f(\bm x,t)]\dd V,
+\]
+则算法 4 中刚体平移动量方程可直接写成
+\begin{align}
+M_s\frac{\D\bm U_s}{\D t}
+&=\int_{\partial\Omega_s}\bm\sigma_f^{+}\cdot\hat{\bm n}\dd S
++\int_{\partial\Omega_s}\bm F_s\dd S
++\int_{\Omega_s}\bm f_b\dd V
++\int_{\Omega_s}\rho_f(\bm x,t)\bm g\dd V+\Delta M\bm g \nonumber\\
+&=\int_{\partial\Omega_s}\bm\sigma_f^{+}\cdot\hat{\bm n}\dd S
++\int_{\partial\Omega_s}\bm F_s\dd S
++\int_{\Omega_s}\bm f_b\dd V+M_s\bm g. \tag{54}
+\end{align}
+刚体角动量方程保持不变，因为式（49）中的重力项不会对物体产生净转动力矩。文献\,[44--48]使用算法 4、5 配合 Brinkman 惩罚技术模拟多相 FSI。
+
+\subsection{界面追踪方法}
+
+在隐式追踪两种流体相界面的众多方法中，水平集（level set, LS）和流体体积法（volume of fluid, VOF）是最常用的两类。对于气--液--固三相 FSI，流体界面输运大致存在两种不同策略：（i）\textbf{固体感知型（solid-aware）}；（ii）\textbf{固体无感型（solid-agnostic）}。
+
+几何 VOF 本质上是非连续的界面捕捉方法，因此最自然地适合固体感知型方案。这种方案先重构计算域中更新后的固体界面，然后只在剩余区域
+\[
+\Omega_f(t)=\Omega\setminus\Omega_s(t)
+\]
+内输运气相和液相体积分数。由于算法设计本身不允许气液界面存在于固体区域内部，因此几何 VOF 中不会出现“穿过固体”的气液界面，见图 3(a)；同时还可以几何重构材料三相接触点。Pathak 和 Raessi\,[42]把固体感知型几何 VOF 与虚拟域 IB 算法 3 结合，用于三相 FSI。
+
+固体无感型方案则允许连续气液界面自由穿过固体，见图 3(b)。LS 方法最适合这种做法，并可显著简化实现。不过，一旦固体区域内部也存在气液界面，真实流体质量与虚拟流体质量之间的区分就会变得模糊。对于某些问题，如果流体总体积远大于浸没固体体积，例如波浪能转换器或船舶水动力学，那么“穿入”固体内部的流体体积占比很小，对整体 FSI 动力学影响有限。因此，多项大水域三相 FSI 工作采用了固体无感型 LS 输运\,[49,44--48]。但如果流体体积显著小于或与固体体积可比，而气液界面又允许存在于浸没体内部，就必须在界面输运中施加额外约束，以守恒固体外部的总流体体积。Khedkar 等\,[50]近期讨论了这类约束。
+
+\section{其他问题与改进}
+
+本节讨论浸没边界法的一些其他问题以及文献中提出的改进。IB 文献极其庞大，以下内容并非穷尽性综述，但涵盖若干关键进展。
+
+\subsection{高密度比流动}
+
+在不同可流动相之间存在高密度比（$\gtrsim100$）的流固耦合问题中，高 Reynolds 数下通常容易出现数值不稳定\,[43,51,52,42,53,54]。需要强调的是，这类不稳定源于\textbf{流动相之间}的高密度差；如果使用扩展域方法，仅仅向计算域加入一个固相并不会自动导致数值不稳定。例如，考虑固体完全浸没在均匀单一流体相中的两相问题，虚拟域 FSI 对极低、近似相等、完全相等以及很高的固--液密度比都可以保持稳定\,[55,56]。而非虚拟域方法不会把流体解延拓进结构区域，因此轻质结构置于高密度流体中时通常还会受到典型的“附加质量”效应影响。
+
+近年来已经提出多种高密度比流动稳定化方法，涵盖 VOF、LS 以及其他界面追踪技术\,[57--61]。这些稳定化技术的核心思想，是在离散层面使动量对流算子使用的\textbf{质量通量}与密度输运方程使用的质量通量严格一致。由于两个对流算子之间存在强耦合，需要使用守恒形式的动量和质量守恒方程，而不能继续采用式（43）与式（46）的非守恒形式。多相虚拟域算法通过在固体区域内令虚拟流体密度与固体密度匹配，使整个 $\Omega$ 上只需一个统一密度场 $\rho_f(\bm x,t)$。Nangia 等\,[43]采用的高密度比稳定化 FDM 如算法 8 所示，这里以自推进物体为例。
+
+\begin{algbox}{算法 8：高密度比稳定化虚拟域法}
+\item 根据界面变量 $\phi^n$ 设置 $\rho_f^n$。其中标量 $\phi$ 隐式追踪不同物相。
+\item 积分质量守恒方程
+\[
+\frac{\partial\rho_f}{\partial t}+\nabla\cdot(\rho_f\bm u_f)=0,
+\]
+例如使用 SSP-RK3，得到 $\rho_f^{n+1}$。保存该输运方程所使用的离散质量通量 $\widehat{\rho_f\bm u_f}$。
+\item 推进水平集或 VOF 变量
+\[
+\frac{\partial\phi}{\partial t}+\bm u_f\cdot\nabla\phi=0,
+\qquad \phi^n\longrightarrow\phi^{n+1}.
+\]
+\item 用最新的 $\phi^{n+1}$ 设置黏度场，或直接输运黏度：$\mu_f^n\to\mu_f^{n+1}$。
+\item 使用更新后的 $\rho_f^{n+1}$ 与 $\mu_f^{n+1}$，在整个 $\Omega$ 上以守恒形式求解流体动量方程
+\begin{align*}
+\frac{\rho_f^{n+1}\tilde{\bm u}_f-\rho_f^n\bm u_f^n}{\Delta t}
++\nabla\cdot\left(\widehat{\rho_f\bm u_f}\,\tilde{\bm u}_f\right)
+&=\nabla\cdot\tilde{\bm\sigma}+\rho_f^{n+1}\bm g,\\
+\nabla\cdot\tilde{\bm u}_f&=0.
+\end{align*}
+动量对流算子必须使用步骤 2 中\textbf{同一个}离散质量通量。
+\item 求固体刚体速度分量
+\begin{align*}
+\int_B\bm\lambda^{n+1}\dd V&=0\quad\Longrightarrow\quad\bm U_s^{n+1},\\
+\int_B\bm r\times\bm\lambda^{n+1}\dd V&=0\quad\Longrightarrow\quad\bm\omega_s^{n+1},\\
+\bm\lambda^{n+1}
+&=\rho_f^{n+1}\frac{\bm U_s^{n+1}+(\bm\omega_s^{n+1}\times\bm r)+\bm u_{s,\mathrm{def}}^{n+1}-\tilde{\bm u}_f}{\Delta t}.
+\end{align*}
+此处假设不存在外力和外力矩，$\bm\lambda$ 定义在 $B(t)$ 上。
+\item 在 $B(t)$ 上施加速度约束
+\[
+\rho_f^{n+1}\frac{\bm u_f^{n+1}-\tilde{\bm u}_f}{\Delta t}=\bm\lambda^{n+1},
+\]
+即 Chorin 型投影。
+\end{algbox}
+
+步骤 1 先把时间层 $n$ 的密度场与 LS/VOF 标量 $\phi$ 同步。实际计算中可能使用多个标量分别追踪气液、固液等不同界面，此时算法 8 中的 $\phi$ 应理解为这组界面变量。每个时间步重新由 $\phi$ 构造密度，可避免直接输运 $\rho_f$ 导致界面随时间逐渐数值扩散。步骤 2 利用离散质量通量 $\widehat{\rho_f\bm u_f}$ 把密度推进到 $n+1$；步骤 3 再把界面标量推进到 $n+1$，随后步骤 4 用最新界面更新黏度 $\mu_f^{n+1}$（也可以直接输运黏度，但实际较少这样做）。步骤 5 用更新后的密度和黏度，以守恒形式求解动量与连续性方程。其关键是动量和质量输运必须使用步骤 2 的同一离散质量通量；对于高密度比问题，这种离散一致性对稳定性至关重要。步骤 6、7 的固体刚性约束基本与算法 3 相同。
+
+\subsection{水动力和力矩的计算}
+
+在速度强迫法中，需要净水动力和净水动力矩来更新刚体平移与旋转速度。相比之下，虚拟域算法 3 推进刚体动力学时不必显式计算这两个量；不过，固体表面的水动力应力和力作为后处理信息仍然非常重要，例如阻力系数和升力系数等空气动力性能指标都需要由此获得。
+
+虚拟域法和速度强迫法通常采用弥散界面实现：约束刚性的拉格朗日乘子 $\bm\Lambda_s$ 或 $\bm\lambda_b$ 会通过正则化积分核进行平滑扩散。传统 IB 数值实现利用正则核把界面应力跳跃平滑化，因此应力一般不能逐点收敛。但 Goza 等\,[62]指出，应力的零阶矩（净水动力）和一阶矩（净水动力矩）仍能以一阶速率收敛。这源于对第一类离散积分方程的求解，它显式施加式（23）的 Dirichlet 边界条件。尽管如此，在浸没方法中获得平滑且最好逐点收敛的表面应力仍很有价值。下面介绍几类用于获得平滑、甚至可收敛水动力与力矩的算法。
+
+\subsubsection{平滑的净水动力与净水动力矩}
+
+如果只关心作用在固体表面的\textbf{净}水动力和净水动力矩，则可直接利用拉格朗日乘子计算，而不必在复杂浸没表面上求压力或速度导数。算法 4 已经涉及这一点，对应关系为
+\begin{align}
+\int_{\partial\Omega_s}\bm\sigma_f^{+}\cdot\hat{\bm n}\dd S
+&=\frac{\D}{\D t}\left(\int_{\Omega_s}\rho_f\bm u_f\dd V\right)-\int_{\Omega_s}\bm\lambda\dd V, \tag{55}\\
+\int_{\partial\Omega_s}\bm r\times(\bm\sigma_f^{+}\cdot\hat{\bm n})\dd S
+&=\frac{\D}{\D t}\left(\int_{\Omega_s}\bm r\times\rho_f\bm u_f\dd V\right)
+-\int_{\Omega_s}\bm r\times\bm\lambda\dd V. \tag{56}
+\end{align}
+
+Goza 等\,[62]表明，无论用于扩散约束力的正则化核宽度如何，$\bm\lambda$ 的零阶矩都保持平滑；积分的平滑性也不依赖核函数的可微阶数。例如，他们分别使用 $C^0,C^1,C^2,C^3$ 和 $C^{\infty}$ 核计算 $\int\bm\lambda\dd V$，所得结果都十分相似。同样，约束力的一阶矩 $\int\bm r\times\bm\lambda\dd V$ 也是平滑的。式（55）和式（56）右端的时间导数项分别代表物体的线加速度和角加速度。若物体运动学预先给定且足够光滑，这些加速度项同样平滑；但对自由运动物体，时间导数通常含有伪振荡。可用移动点平均或其他滤波方法轻易滤除这些振荡而不丢失有物理意义的信息，Bhalla 等\,[63]给出了相关示例。因此，用式（55）和式（56）求净水动力和净力矩，可以得到平滑的水动力量。
+
+用拉格朗日描述表示浸没体时，式（55）、（56）右端很容易计算。对于纯 Euler 实现的 IBM（例如 Brinkman 惩罚法），Nangia 等\,[64]利用 Leibniz 积分法则，把式（55）、（56）中原本位于 $\Omega_s$ 上的积分转移到包围浸没体的移动控制体上。这个移动区域可方便地选成与 Cartesian 网格线对齐的矩形区域，而且控制体速度可以与所追踪固体的速度不同。文献\,[64]的结果表明，Euler 移动控制体方法与 Lagrange 乘子方法得到的净水动力和力矩等价，且这种变换不会破坏水动力量的平滑性。
+
+\subsubsection{平滑的逐点水动力和力矩}
+
+有时还希望获得水动力应力在物体表面上的逐点分布，以分析不同位置对力和力矩的贡献。Verma 等\,[65]建议，不要直接在真实界面上计算，而是在朝流体一侧“抬升”的表面 $\partial\Omega_s^{+}$ 上评价这些量。如果固体真实表面由水平集的零等值面表示，那么抬升表面可以理解为另一个等值面，其水平集值与正则核半宽成比例。Verma 等的结果表明，在这个抬升表面上计算压力或速度导数，可以得到平滑的应力值。
+
+\subsubsection{平滑的逐点约束力}
+
+在拉格朗日乘子框架下，Goza 等\,[62]提出了一种成本很低的后处理滤波技术，通过重新分配约束力来平滑 $\bm\Lambda_s$ 场。由于只是后处理，该技术不会影响原始速度场或压力场的收敛。其结果表明，受正则核影响，原始 $\bm\Lambda_s$ 随网格细化并不收敛，但滤波后的 $\bm\Lambda_s$ 可以收敛。需要注意，$\bm\Lambda_s$ 代表式（25）中 $\bm\sigma_f^{+}$ 与 $\bm\sigma_f^{-}$ 之间的应力跳跃，不能把它直接解释为固体表面真实逐点水动力；后者属于上一小节讨论的量。不过，如果确实希望得到平滑、收敛的约束力，例如为了按算法 2 进一步计算逐点 $\bm F_s$，Goza 等的方法非常有用。
+
+\subsection{表面约束力 \texorpdfstring{$\bm\Lambda_s$}{Lambda_s} 的尖锐实现}
+
+传统浸没体方法在数值上通常使用具有有限非零支撑宽度的正则化积分核，把表面约束力 $\bm\Lambda_s$ 平滑扩散到流体网格。另一种思路是直接在流体网格上\textbf{尖锐}表示约束力。本节简要介绍 Kolahdouz 等\,[66,56,67]提出的尖锐实现方法。
+
+考虑速度强迫算法 5 的一个版本，只在物体表面 $\partial\Omega_s(t)$ 上施加约束力，即 $\bm\lambda=\bm\Lambda_s\delta_s$。文献\,[66,56,67]采用的就是这种形式。尖锐施加约束力的核心，是在流体网格上显式满足式（25）的跳跃条件。把它改写为
+\begin{align}
+\jump{\bm\sigma_f}\cdot\hat{\bm n}
+&=\left[\bm\sigma_f^{+}-\bm\sigma_f^{-}\right]\cdot\hat{\bm n}=-\bm\Lambda_s, \tag{57}\\
+\bm\Lambda_s(\bm x,t)\approx\widehat{\bm\Lambda}_s(\bm x,t)
+&=k(\bm x_s-\bm x)+c\,[\bm u_s(\bm x,t)-\bm u_f(\bm x,t)],
+\qquad \bm x\in\partial\Omega_s(t). \tag{58}
+\end{align}
+其中 $k$ 是类似弹簧刚度的惩罚参数，$c$ 是类似阻尼系数的惩罚参数，$\bm x_s$ 和 $\bm u_s$ 分别为浸没表面 $\partial\Omega_s(t)$ 的给定位置和速度。当 $k\to\infty$ 和/或 $c\to\infty$ 时，惩罚约束力 $\widehat{\bm\Lambda}_s$ 逼近真正的拉格朗日乘子 $\bm\Lambda_s$。式（58）这种弱约束的优点，是可以避免完全隐式 FDM。下面的推导并不依赖 $\bm\Lambda_s$ 的具体表达，因此隐式和显式处理均可。
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.34\textwidth]{figs/fig4.png}
+\caption{界面局部单位法向 $\hat{\bm n}$ 与两个切向 $\hat{\bm t},\hat{\bm b}$。推导跳跃条件时选用这一局部正交归一坐标系。}
+\end{figure}
+
+继续推导时，假设虚拟流体应力 $\bm\sigma_f^{-}$ 与界面外真实流体应力 $\bm\sigma_f^{+}$ 使用相同本构形式，同时界面两侧流体黏度相同，即 $\jump{\mu_f}=0$。由于流动有黏性，速度分量 $\bm u_f\equiv(u,v,w)$ 及其切向导数在界面两侧连续：
+\begin{align}
+\jump{u}=\jump{v}=\jump{w}&=0, \tag{59}\\
+\jump{\nabla u\cdot\hat{\bm t}}=
+\jump{\nabla v\cdot\hat{\bm t}}=
+\jump{\nabla w\cdot\hat{\bm t}}&=0, \tag{60}\\
+\jump{\nabla u\cdot\hat{\bm b}}=
+\jump{\nabla v\cdot\hat{\bm b}}=
+\jump{\nabla w\cdot\hat{\bm b}}&=0. \tag{61}
+\end{align}
+这里 $\hat{\bm t}$ 和 $\hat{\bm b}$ 是界面局部切向。界面两侧不可压条件给出 $\jump{\nabla\cdot\bm u}=0$。在局部正交基下，可展开为
+\begin{align}
+&\jump{(\nabla u\cdot\hat{\bm n},\nabla v\cdot\hat{\bm n},\nabla w\cdot\hat{\bm n})\cdot\hat{\bm n}}\nonumber\\
+&\quad+\underbrace{\jump{(\nabla u\cdot\hat{\bm t},\nabla v\cdot\hat{\bm t},\nabla w\cdot\hat{\bm t})\cdot\hat{\bm t}}}_{=0}
++\underbrace{\jump{(\nabla u\cdot\hat{\bm b},\nabla v\cdot\hat{\bm b},\nabla w\cdot\hat{\bm b})\cdot\hat{\bm b}}}_{=0}=0. \tag{62}
+\end{align}
+利用式（60）、（61），后两项消失，因此式（62）表示速度法向分量的法向导数连续：
+\begin{equation}
+\jump{\frac{\partial(\bm u_f\cdot\hat{\bm n})}{\partial n}}=0. \tag{63}
+\end{equation}
+
+将式（57）与 $\hat{\bm n}$ 点乘，并结合式（63）以及 $\jump{\mu_f}=0$，可得到界面压力跳跃
+\begin{equation}
+\jump{p_f(\bm x,t)}=\bm\Lambda_s(\bm x,t)\cdot\hat{\bm n}. \tag{64}
+\end{equation}
+同理，把式（57）分别与 $\hat{\bm t}$ 和 $\hat{\bm b}$ 点乘，可得黏性应力跳跃
+\begin{equation}
+\mu_f\jump{\frac{\partial(\bm u_f\cdot\hat{\bm t})}{\partial n}}
+=-\bm\Lambda_s\cdot\hat{\bm t},
+\qquad
+\mu_f\jump{\frac{\partial(\bm u_f\cdot\hat{\bm b})}{\partial n}}
+=-\bm\Lambda_s\cdot\hat{\bm b}. \tag{65}
+\end{equation}
+式（63）和式（65）可以写成矩阵形式
+\begin{equation}
+\begin{pmatrix}
+\hat{\bm n}\\[0.1em]\hat{\bm t}\\[0.1em]\hat{\bm b}
+\end{pmatrix}
+\begin{pmatrix}
+\jump{\nabla u}\\[0.1em]\jump{\nabla v}\\[0.1em]\jump{\nabla w}
+\end{pmatrix}
+\begin{pmatrix}
+\hat{\bm n}\\[0.1em]\hat{\bm t}\\[0.1em]\hat{\bm b}
+\end{pmatrix}^{T}
+=\frac{1}{\mu_f}
+\begin{pmatrix}
+0&0&0\\
+-\bm\Lambda_s\cdot\hat{\bm t}&0&0\\
+-\bm\Lambda_s\cdot\hat{\bm b}&0&0
+\end{pmatrix}. \tag{66}
+\end{equation}
+或者更显式地写成
+\begin{equation}
+\begin{pmatrix}
+\jump{\partial u/\partial x}&\jump{\partial u/\partial y}&\jump{\partial u/\partial z}\\
+\jump{\partial v/\partial x}&\jump{\partial v/\partial y}&\jump{\partial v/\partial z}\\
+\jump{\partial w/\partial x}&\jump{\partial w/\partial y}&\jump{\partial w/\partial z}
+\end{pmatrix}
+=\frac{1}{\mu_f}
+\begin{pmatrix}\hat{\bm n}\\\hat{\bm t}\\\hat{\bm b}\end{pmatrix}^{T}
+\begin{pmatrix}
+0&0&0\\
+-\bm\Lambda_s\cdot\hat{\bm t}&0&0\\
+-\bm\Lambda_s\cdot\hat{\bm b}&0&0
+\end{pmatrix}
+\begin{pmatrix}\hat{\bm n}\\\hat{\bm t}\\\hat{\bm b}\end{pmatrix}. \tag{67}
+\end{equation}
+
+式（64）与式（67）的跳跃条件可以直接嵌入动量方程使用的有限差分模板，而不是通过光滑核把约束力正则化。这样便能在流体网格上尖锐表示表面约束力。Kolahdouz 等\,[66,56,67]采用现代浸没界面法（immersed interface method, IIM）\,[68,69]，通过广义 Taylor 展开把物理跳跃条件嵌入有限差分模板，同时无需修改线性求解器。它不同于 LeVeque 和 Li\,[70]最早针对含不连续系数与奇异力的椭圆 PDE 提出的 IIM：原始 IIM 会修改界面附近的 Poisson 算子，因此需要不同于标准 Poisson 求解器的线性求解器。后来，原始 IIM 已被扩展到不可压 Stokes\,[71,72]、Navier--Stokes\,[73,74]，并与水平集法结合\,[75--77]。
+
+还需指出，本节这种“尖锐实现约束力”的方法，不应与其他文献中的尖锐界面方法混为一谈，例如嵌入边界法\,[78,79]、cut-cell 方法\,[80--82]、曲线坐标浸没边界法\,[83,84]和 ghost-cell 浸没边界法\,[85]。这些方法与本节的拉格朗日乘子方法不同：它们只在浸没体外部求解流体方程，并把虚拟流体域内部的求解结果置零。它们不依赖约束力，而是通过速度重构\,[83]或 cut-cell 处理\,[86]直接施加速度匹配条件。
+
+\subsection{浸没表面上的 Neumann 与 Robin 边界条件}
+
+虚拟域思路不仅可用于流固耦合，还可以推广到浸没表面上的传热、传质或化学反应。此类输运问题中，Dirichlet、Neumann 和 Robin 三类边界条件都可能出现；而纯流固耦合速度问题只需要第 2 节讨论的 Dirichlet 条件。本节以一般标量 $q(\bm x,t)$ 的输运方程为例，并以最一般的 Robin 边界条件说明如何在固体表面施加不同边界条件：
+\begin{align}
+\frac{\partial q(\bm x,t)}{\partial t}
++\bm u_f(\bm x,t)\cdot\nabla q(\bm x,t)
+&=\nabla\cdot[D\nabla q(\bm x,t)]+f(\bm x,t), &&\bm x\in\Omega, \tag{68}\\
+a q+b\frac{\partial q}{\partial n}
+&=g(\bm x,t), &&\bm x\in\partial\Omega_s(t). \tag{69}
+\end{align}
+其中 $D$ 是可随空间或时间变化的扩散系数，$f(\bm x,t)$ 为源/汇项，$\bm u_f(\bm x,t)$ 为对流速度，通常来自与输运方程耦合求解的 FSI 系统。假设 $q$ 在外部计算域边界 $\partial\Omega$ 上满足适当边界条件，下面省略这些外边界条件。
+
+使用体积惩罚（volume penalization, VP）可以把输运方程和固体表面 Robin 条件合并成单一方程：
+\begin{equation}
+\frac{\partial q}{\partial t}
++(1-\chi)(\bm u_f\cdot\nabla q)
+=\nabla\cdot[D\nabla q(\bm x,t)]+(1-\chi)f
++\frac{\chi}{\eta}\left(aq+b\frac{\partial q}{\partial n}-g\right). \tag{70}
+\end{equation}
+其中 $\eta$ 为惩罚参数，$\chi(\bm x,t)$ 为固体特征函数：若 $\bm x\in\Omega_s(t)\cup\partial\Omega_s$，则 $\chi=1$；若 $\bm x\notin\Omega_s(t)$，则 $\chi=0$。因此在真实流体域内 $\chi=0$ 时，式（70）自然退化回原始输运式（68）。当 $\eta\to0$ 时，可以证明惩罚方程式（70）的解收敛于原始系统的解\,[87]。
+
+式（70）可以按照 Robin 惩罚项的时间离散方式采用不同求解策略。Brown-Dymkoski 等\,[88]以及 Hardy 等\,[89]在可压缩流能量输运中显式处理最后一个惩罚项；Bensiali 等\,[87]则将其隐式并入联立方程。如果固体表面希望施加 Dirichlet 条件，即式（69）取 $a=1,b=0$，则 VP 输运式（70）退化为 Angot 等\,[34]提出的经典 Brinkman 惩罚形式。
+
+Thirumalaisamy 等\,[90,91]针对 $\partial\Omega_s$ 上的齐次和空间变化非齐次 Neumann 条件提出了另一种表述，对应式（69）中的 $a=0,b=D$。他们通过修改扩散算子施加通量边界条件。对应的 VP 输运方程为
+\begin{equation}
+\frac{\partial q}{\partial t}
++(1-\chi)(\bm u_f\cdot\nabla q)
+=\nabla\cdot\left(\{D(1-\chi)+\eta\chi\}\nabla q\right)
++(1-\chi)f+\nabla\cdot(\chi\bm\beta)-\chi\nabla\cdot\bm\beta, \tag{71}
+\end{equation}
+其中 $\bm\beta(\bm x,t)$ 是任意通量强迫函数，只需在界面 $\partial\Omega_s$ 上满足
+\[
+\hat{\bm n}\cdot\bm\beta=g(\bm x,t).
+\]
+式（71）的严格推导见文献\,[91]。下面给出一个更直观的解释。
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.48\textwidth]{figs/fig5.png}
+\caption{利用惩罚 Poisson 方程式（72）在嵌入界面上施加空间变化的 Neumann 与 Robin 边界条件。$\hat{\bm n}$ 为流体区域（粉色区域）的外法向。}
+\end{figure}
+
+考虑删去式（71）的时间导数和对流项后得到的稳态惩罚 Poisson 方程
+\begin{equation}
+-\nabla\cdot\left[\{D(1-\chi)+\eta\chi\}\nabla q+\chi\bm\beta\right]
+=(1-\chi)f-\chi\nabla\cdot\bm\beta. \tag{72}
+\end{equation}
+在流体域内对式（72）积分并使用 Gauss 散度定理，得到
+\begin{align}
+-\int_{\Omega_f}\nabla\cdot\left[\{D(1-\chi)+\eta\chi\}\nabla q+\chi\bm\beta\right]\dd V
+&=\int_{\Omega_f}\left[(1-\chi)f-\chi\nabla\cdot\bm\beta\right]\dd V, \tag{73}\\
+-\int_{\partial\Omega}D\nabla q\cdot\hat{\bm n}\dd S
+-\int_{\partial\Omega_s}(\eta\nabla q+\bm\beta)\cdot\hat{\bm n}\dd S
+&=\int_{\Omega_f}f\dd V, \tag{74}\\
+-\int_{\partial\Omega}D\nabla q\cdot\hat{\bm n}\dd S
+-\int_{\partial\Omega_s}\bm\beta\cdot\hat{\bm n}\dd S
+&=\int_{\Omega_f}f\dd V,\qquad(\eta\to0). \tag{75}
+\end{align}
+式（74）使用了 $\chi=0$ 于 $\Omega_f$、$\chi=1$ 于 $\Omega_s$ 及其边界。于是，当 $\eta\to0$ 时，式（72）收敛到嵌入界面上具有通量边界条件的非惩罚 Poisson 方程。
+
+Thirumalaisamy 等还把该通量边界方法扩展到 $\partial\Omega_s$ 上空间变化的 Robin 条件，对应式（69）中的 $a=\zeta,b=D$。浸没界面 Robin 条件的惩罚 Poisson 方程为\,[91]
+\begin{equation}
+\zeta\,[\nabla\cdot(\chi\hat{\bm n})-\chi\nabla\cdot\hat{\bm n}]\,q
+-\nabla\cdot\left[\{D(1-\chi)+\eta\chi\}\nabla q\right]
+=(1-\chi)f+\nabla\cdot(\chi\bm\beta)-\chi\nabla\cdot\bm\beta. \tag{76}
+\end{equation}
+这里仍要求向量强迫函数满足 $\hat{\bm n}\cdot\bm\beta=g(\bm x,t)$。式（76）的严格推导见文献\,[91]。对于几何复杂的界面，构造 $\bm\beta$ 本身并不简单；文献\,[91]给出了基于有符号距离函数的数值构造方法。
+
+\subsection{“泄漏”问题}
+
+在弥散界面 IB 中，约束力通过正则化积分核扩散。典型各向同性核会同时把结构自由度耦合到界面两侧的流体自由度，从而产生虚假的反馈力和固体内部流动。IB 文献通常把这种固体内部伪流动称作“泄漏”（leakage）。最常见的“水密化”建议，是在整个 $B(t)$ 上施加 $\bm u_s=\bm u_f$，而不仅仅在 $\partial\Omega_s(t)$ 上施加。体积式无滑移约束能显著减弱固体内部伪流，但不能完全消除；而且最能降低泄漏的 Lagrange 网格间距与 Euler 网格尺寸之比，往往需要经验确定。例如，对 Peskin IBM 算法 1，推荐的 Lagrange 点间距约为 Euler 单元尺寸的 $1/2$ 到 $1/3$\,[92]，也就是每个 Euler 网格单元每个坐标方向放置约 2--3 个 Lagrange 点；对虚拟域算法 3，推荐比值约为 1\,[24,63]。此外，如果用完全隐式虚拟域法在整个体积施加无滑移约束，约束力自由度会显著增多，从而大幅增加问题规模和计算成本，尤其对三维固体更为明显\,[38,39]。
+
+Bale 等\,[93]最近提出了基于移动最小二乘（moving least squares, MLS）核的单侧直接强迫 IBM。其核函数只把结构自由度与流固界面\textbf{一侧}的流体变量耦合。结果表明，对于较高 Reynolds 数流动，单侧 IB 核能显著减少传统弥散界面 IB 中的虚假反馈力和固体内部流动。下面概述 MLS 单侧核的构造。
+
+在 MLS 中，寻求如下准插值：
+\begin{equation}
+P f(\bm x)=\sum_{i=1}^{N}f(\bm x_i)\psi_i(\bm X), \tag{77}
+\end{equation}
+其中 $P$ 是插值算子，$\bm f=[f(\bm x_1),\ldots,f(\bm x_N)]^T$ 是 $N$ 个插值点上的已知数据，$\bm X$ 是评价点。MLS 计算生成函数 $\psi_i(\bm X)=\{\psi(\bm x_i,\bm X)\}$，并要求满足多项式再现约束
+\begin{equation}
+\sum_{i=1}^{N}p(\bm x_i)\psi_i(\bm X)=p(\bm X),
+\qquad \forall p\in\Pi_d^s, \tag{78}
+\end{equation}
+其中 $\Pi_d^s$ 是总次数不超过 $d$ 的 $s$ 元多项式空间，多项式基的大小为
+\[
+m=\frac{(s+d)!}{s!\,d!}.
+\]
+这些多项式再现约束等价于 $\psi_i(\bm X)$ 的离散矩条件。矩阵形式为
+\begin{equation}
+\bm A\bm\Psi(\bm X)=\bm P(\bm X), \tag{79}
+\end{equation}
+其中 $\bm A\in\R^{m\times N}$ 的元素为 $A_{ij}=p_i(\bm x_j)$，$i=1,\ldots,m$，$j=1,\ldots,N$；右端向量 $\bm P=[p_1,\ldots,p_m]^T$ 包含各基函数在评价点 $\bm X$ 的值；未知生成函数向量为 $\bm\Psi=[\psi_1,\ldots,\psi_N]^T$。通常 $N\gg m$，因此式（79）是欠定系统，需要在加权最小二乘意义下求解，并用拉格朗日乘子 $\bm\Upsilon(\bm X)$ 强制满足再现条件。令 $W(\bm x_i,\bm X)$ 为随数据点远离评价点而衰减的正权函数，则定义 Gram 矩阵
+\[
+\bm G(\bm X)=\bm A\bm W\bm A^T\in\R^{m\times m},
+\]
+拉格朗日乘子由
+\begin{equation}
+\bm G(\bm X)\bm\Upsilon(\bm X)=\bm P(\bm X) \tag{80}
+\end{equation}
+得到。这里 $\bm W(\bm X)=\operatorname{diag}(\bm W)$ 是权重对角矩阵，$\bm W=(W(\bm x_1,\bm X),\ldots,W(\bm x_N,\bm X))$ 是其对角元素。若多项式基线性无关，则对称正定 Gram 矩阵的元素就是多项式的加权 $L^2$ 内积：
+\begin{equation}
+G_{jk}(\bm X)=\langle p_j,p_k\rangle_{W(\bm X)}
+=\sum_{i=1}^{N}p_j(\bm x_i)p_k(\bm x_i)W(\bm x_i,\bm X),
+\qquad j,k=1,\ldots,m. \tag{81}
+\end{equation}
+得到 $\bm\Upsilon(\bm X)$ 后，生成函数为
+\begin{equation}
+\psi(\bm x_i,\bm X)=\psi_i(\bm X)
+=W(\bm x_i,\bm X)\sum_{j=1}^{m}\Upsilon_j(\bm X)p_j(\bm x_i),
+\qquad i=1,\ldots,N. \tag{82}
+\end{equation}
+矩阵形式为
+\begin{equation}
+\bm\Psi(\bm X)=\bm W(\bm X)\odot\bm L(\bm X), \tag{83}
+\end{equation}
+其中 $\bm L(\bm X)=\bm A^T\bm\Upsilon(\bm X)$，$\odot$ 表示逐分量乘积。
+
+为了利用 MLS 得到单侧 IB 核 $\psi^{\circ}(\bm x_i,\bm X)$，定义 Heaviside 函数
+\begin{equation}
+H(\bm x)=
+\begin{cases}
+0, & \bm x\in\Omega_b^{-},\\
+1, & \bm x\in\Omega_b^{+}\cup\partial\Omega_b,
+\end{cases} \tag{84}
+\end{equation}
+用它选择界面 $\partial\Omega_b$ 的指定一侧作为 Euler 速度插值和 Lagrange 力扩散区域。评价/Lagrange 点 $\bm X$ 的作用域，就是满足 $H(\bm x)=1$ 的空间区域，见图 6。再用 Heaviside 函数限制标准权重：
+\begin{equation}
+W_{\mathrm{MLS}}(\bm x_i,\bm X)=W(\bm x_i,\bm X)H(\bm x_i),
+\qquad
+W_{\mathrm{MLS}}(\bm x_i,\bm X)=0\ \ \forall\bm x_i\in\Omega_b^{-}. \tag{85}
+\end{equation}
+很容易验证，把 $W_{\mathrm{MLS}}$ 代入式（82）后，会得到 $\psi^{\circ}(\bm x_i,\bm X)=0$ 对所有 $\bm x_i\in\Omega_b^{-}$ 成立。
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.72\textwidth]{figs/fig6.png}
+\caption{根据界面 $\partial\Omega_b$ 的位置，把 Euler 计算域 $\Omega$ 分成内部区域 $\Omega_b^{-}$ 与外部区域 $\Omega_b^{+}$。界面上的 Lagrange 标记点可分别从两侧插值速度并向两侧扩散力。图示例中定义 $H=1$ 于 $\Omega_b^{+}$，$H=0$ 于 $\Omega_b^{-}$，因此 $\Omega_b^{+}$ 是 Lagrange 标记点的相互作用区域。}
+\end{figure}
+
+\subsection{稠密颗粒负载流}
+
+含颗粒流动广泛存在于自然和工业过程，例如沙尘暴、河流泥沙输运以及化学反应器中的颗粒弥散。为了理解流场中颗粒行为，数值模拟十分重要；在 CFD 模拟颗粒负载流时，必须同时考虑其他颗粒的存在以及颗粒与流体之间的相互作用。IBM 可以对这类问题进行直接数值模拟（DNS）。但当两颗粒十分接近，或者颗粒接近计算域边界时，IB 核的支撑域可能进入邻近颗粒内部，或伸出计算域，从而显著降低 IB 模拟精度。传统 IB 往往用人工排斥力避免颗粒碰撞或过度靠近\,[6,7]。
+
+Ch\'eron 等\,[97,98]最近提出了一种很有前景的方案，将 Bale 等\,[93]在第 5.5 节讨论的单侧 IB 核用于稠密颗粒负载流。其关键做法是把颗粒\textbf{内部}作为 Euler 速度插值和 Lagrange 约束力扩散的相互作用域，如图 7 所示。这样，单侧 IB 核不再受颗粒间隙宽度影响。文献\,[97,98]表明，与经典 IBM 框架相比，单侧 IB 在颗粒彼此靠近或颗粒靠近域壁面时可以获得更好的结果。
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.72\textwidth]{figs/fig7.png}
+\caption{稠密颗粒负载流中的单侧 IB 核。界面上的 Lagrange 标记点从颗粒内部区域 $\Omega_b^{-}$ 插值速度并把约束力扩散到该区域。这里定义 $H=1$ 于 $\Omega_b^{-}$、$H=0$ 于 $\Omega_b^{+}$，因此 $\Omega_b^{-}$ 是标记点的相互作用区域。}
+\end{figure}
+
+\section{未来挑战}
+
+在弥散界面 IB 中，约束力通过正则化积分核扩散到背景网格；而在尖锐界面 IB 中，由约束力产生的跨界面跳跃条件则直接在流体网格上解析。前者实际实现更容易，因为只需构造核函数权重，在 Euler 网格和 Lagrange 网格之间传递变量；后者则需要计算几何操作来识别哪些 Euler 网格点必须施加跳跃条件。对于复杂几何，尤其是三维几何，这会带来大量几何判定和数据管理工作。一个可能的替代思路，是构造\textbf{自动满足目标跳跃条件的核函数权重}。这样可以同时保留弥散界面方法易于实现的优点和尖锐 IB 更高的空间精度。一种可能途径，是扩展 MLS\,[94--96]：除了通常的多项式再现约束之外，再把物理跳跃条件直接加入 MLS 约束，由此生成新的核权重。
+
+如何使完全隐式虚拟域法在效率上能够与显式、半隐式方法竞争，仍是活跃研究方向。弹性体的刚性、非线性材料模型，以及刚体系统中的稠密 mobility 矩阵，都给整体式（monolithic）FSI 求解器带来很大困难。一种降低整体求解器运行时间的策略，是利用现代 GPU 对大量小型但稠密的矩阵系统执行批量分解；另一种可能，是发展高效的物理预条件器，并利用某些特定 FSI 问题已有的半解析甚至解析解。
+
+浸没边界法传统上主要用于单相流，其在多相流中的应用相对较新。沿着多相建模方向，一个既困难又很有吸引力的应用领域是增材制造，其中固体会发生相变。对于这种问题，弥散界面 IB 可能更合适，因为真实相变边界本身就是“糊状”的。近期已有工作把这种思路用于存在被动气相时的熔化和凝固问题\,[99]。进一步把它扩展到熔化、凝固、蒸发和冷凝同时发生的过程，将具有很高研究价值，因为这些过程广泛存在于焊接、选择性激光熔化/烧结、薄膜沉积等金属制造工艺中。
+
+此外，浸没方法与人工智能方法结合有望形成更高效的计算工具。最后，扩展域强形式的浸没表述还可以进一步探索用于湍流闭合模型和颗粒相闭合模型。
+
+\section*{致谢}
+
+NAP 感谢美国国家科学基金会（NSF）项目 OAC 1450374 和 1931372 的资助。APSB 感谢 NSF 项目 OAC 1931368 和 CBET CAREER 2234387 的资助。
+
+\section*{参考文献}
+\small
+\begin{enumerate}[label={[\arabic*]},leftmargin=3.4em,itemsep=0.3em]
+\input{references_generated.tex}
+\end{enumerate}
+
+\end{document}

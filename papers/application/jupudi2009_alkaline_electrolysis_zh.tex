@@ -1,0 +1,412 @@
+% !TeX program = lualatex
+\documentclass[UTF8,zihao=-4,fontset=fandol]{ctexart}
+
+\usepackage[a4paper,top=2.3cm,bottom=2.4cm,left=2.45cm,right=2.45cm]{geometry}
+\usepackage{amsmath,amssymb,bm}
+\usepackage{booktabs,array}
+\usepackage{graphicx}
+\usepackage{caption}
+\usepackage{float}
+\usepackage{enumitem}
+\usepackage{fancyhdr}
+\usepackage{microtype}
+\usepackage{setspace}
+\usepackage[hidelinks,unicode]{hyperref}
+
+\graphicspath{
+  {output/pdf/jupudi2009_zh_figures/}
+  {jupudi2009_zh_figures/}
+}
+
+\setlength{\parindent}{2em}
+\setlength{\parskip}{0.25em}
+\setstretch{1.28}
+\captionsetup{font=small,labelsep=quad}
+
+\ctexset{
+  section = {
+    format = \large\bfseries,
+    name = {},
+    number = \arabic{section}.,
+    aftername = \quad,
+    beforeskip = 1.35ex plus .3ex,
+    afterskip = .75ex
+  },
+  subsection = {
+    format = \normalsize\bfseries,
+    name = {},
+    number = \arabic{section}.\arabic{subsection},
+    aftername = \quad,
+    beforeskip = 1.05ex plus .2ex,
+    afterskip = .55ex
+  }
+}
+
+\pagestyle{fancy}
+\setlength{\headheight}{14pt}
+\fancyhf{}
+\fancyhead[L]{\small 碱性电解槽中气泡流动与电流密度分布的建模}
+\fancyhead[R]{\small Jupudi 等（2009）}
+\fancyfoot[C]{\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+
+\newcommand{\vect}[1]{\bm{#1}}
+\newcommand{\dif}{\mathop{}\!\mathrm{d}}
+
+\title{\bfseries 碱性电解槽中气泡流动与电流密度分布的建模\\
+\large Modeling Bubble Flow and Current Density Distribution\\
+in an Alkaline Electrolysis Cell}
+\author{
+Ravichandra S. Jupudi\textsuperscript{1}，
+Hongmei Zhang\textsuperscript{2}，\\
+Guillermo Zappi\textsuperscript{2}，
+Richard Bourgeois\textsuperscript{2}\\[0.8em]
+\small\textsuperscript{1}通用电气印度技术中心有限公司应用燃烧实验室，\\[-0.2em]
+\small John F. Welch 技术中心，印度班加罗尔 560066\\
+\small \href{mailto:ravichandra.js@ge.com}{ravichandra.js@ge.com}\\[0.35em]
+\small\textsuperscript{2}通用电气全球研究中心，美国纽约州尼斯卡尤纳
+}
+\date{\small 收稿：2009 年 8 月 19 日；录用：2009 年 11 月 30 日}
+
+\begin{document}
+
+\maketitle
+\thispagestyle{empty}
+
+\begin{center}
+\small\itshape
+中文翻译稿。原文发表于 \emph{Journal of Computational Multiphase Flows},
+Vol.~1, No.~4 (2009), pp.~341--347。
+\end{center}
+
+\begin{abstract}
+本文采用二维计算流体力学模型，研究气泡对碱性电解槽电极表面电流密度分布的影响。
+模型采用欧拉--欧拉两相流方法描述氢气、氧气与水组成的多相流，并依据第一性原理考虑各相行为。
+模型中同时纳入氢气/氧气析出、流场及电流密度分布，以表征该过程所涉及的复杂物理现象。
+两相流由 Fluent 6.2 求解，电化学过程则通过 Fluent 的 UDF（用户自定义函数）功能引入。
+通过网格加密研究及与实验测量结果对比，对模型进行了验证。
+结果表明，该模型能够准确复现槽电压和极间距（两电极之间的距离）对电流密度的影响，
+并能捕捉最优电解槽高度的存在。经验证的模型有望成为碱性电解槽设计与优化中的实用工具。
+
+\noindent\textbf{关键词：}碱性电解；制氢；两相流；最优电解槽高度；离子输运
+\end{abstract}
+
+\section{引言}
+
+碱性电解是利用可再生能源制取氢气的一条很有吸引力的途径。然而，成本是氢气作为燃料获得更广泛应用的一大障碍。
+低成本碱性电解需要电解槽和系统设计方面的创新。本文提出的计算流体力学（CFD）模型旨在辅助此类电解槽的设计与优化。
+
+碱性电解槽的液态电解质中存在气相，因此这是一个两相流问题。
+电化学反应使气泡在电极表面成核并长大；在气泡长大期间，其覆盖的部分电极无法参与反应。
+气泡进入主体电解液后，会减少可供电流传输的纯电解液横截面积，从而降低电解液的有效电导率。
+因此，气泡/气体的释放与运动会显著影响碱性电解槽的性能。
+
+Dahlkild\textsuperscript{[1]} 将混合物两相流模型用于电解过程，并进行了边界层分析。
+数值结果表明，即使在层流条件下，气泡悬浮液的混合作用通常也远强于分子扩散，
+因而离子组分浓度基本均匀。他还指出，沿电极方向气泡分布的不均匀性会导致电流密度分布不均匀。
+Mat 等\textsuperscript{[2,3]} 建立了强制流动电化学系统制氢的两相数学模型，
+发现该模型能够成功捕捉电解过程的主要特征。
+Nagai 等\textsuperscript{[4]} 通过实验研究了电流密度和极间距对水电解效率的影响，
+并在有、无隔膜两种条件下考察了电极高度、系统温度和电极倾角的作用。
+
+本文采用欧拉--欧拉两相流模型，并依据第一性原理描述各相行为。
+Mat 等\textsuperscript{[2,3]} 也曾采用类似模型模拟碱性电解槽阴极通道
+（阴极与隔膜之间的空间）内的两相流；但本文研究的是完整电解槽，即同时包括阴极通道和阳极通道。
+开发该模型的动机，是形成一种最终可用于工业碱性电解槽设计的建模工具。
+这类模型还可用于认识验证实验直接覆盖范围之外的电解槽物理过程。
+
+本研究采用商用软件 Fluent 6.2 建立碱性电解的 CFD 模型，
+其中包含氢气析出、流场和电流密度分布。
+利用用户自定义函数（UDF）功能，将电化学过程耦合至 Fluent 的多相流模块。
+下一节给出相应的数学描述，随后介绍为获得模型验证数据而建立的实验装置。
+结果表明，该模型在定性和定量两方面均有效，因此可作为碱性电解槽设计与优化的有价值工具。
+
+\section{数学描述}
+
+\subsection{两相流}
+
+图~\ref{fig:cell} 给出了本文所研究电解槽的示意图。
+该电解槽由两个电极、液态电解质和隔膜（分离器）构成。
+电极竖直布置，以便通过密度差和对流作用排出气体。
+假设电极厚度无限小，电化学反应发生在其与电解液接触的表面。
+电解槽中的隔膜（分离器）用于防止氢气与氧气混合。
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[height=7.0cm]{fig01_cell_schematic.png}
+  \caption{本文所研究电解槽的示意图。}
+  \label{fig:cell}
+\end{figure}
+
+为模拟系统内的流动行为，在数学上将不同相视为彼此穿透的连续介质。
+由于某一相占据的体积不能再由其他相占据，因此引入相体积分数的概念。
+假设各相体积分数是空间上的连续函数，且其和等于 1，即
+\begin{equation}
+  \alpha_l+\alpha_g=1 ,
+\end{equation}
+其中下标 \(l\) 和 \(g\) 分别表示液相与气相。
+对各相分别建立守恒方程，可得到一组对所有相具有相似结构的方程，
+并通过由经验信息获得的本构关系使方程组封闭。
+
+\noindent\textbf{连续性方程：}
+\begin{equation}
+  \frac{\partial}{\partial t}\left(\alpha_i\rho_i\right)
+  +\nabla\cdot\left(\alpha_i\rho_i\vect{v}_i\right)=0 .
+\end{equation}
+
+\noindent\textbf{动量方程：}
+\begin{align}
+  \frac{\partial}{\partial t}\left(\alpha_i\rho_i\vect{v}_i\right)
+  +\nabla\cdot\left(\alpha_i\rho_i\vect{v}_i\vect{v}_i\right)
+  ={}&-\alpha_i\nabla p
+  +\nabla\cdot\left(\alpha_i\mu_{\mathrm{eff}}\nabla\vect{v}_i\right)
+  +\alpha_i\rho_i\vect{g}
+  +\kappa_{ji}\vect{v}_r \notag\\
+  &+\kappa_{ji}\left(
+  \frac{D_j}{\sigma_{ji}\alpha_j}\nabla\alpha_j
+  -\frac{D_i}{\sigma_{ji}\alpha_i}\nabla\alpha_i
+  \right) .
+\end{align}
+
+式中，下标 \(i\) 和 \(j\) 表示不同相，在本问题中取 \(l\) 或 \(g\)。
+有效黏度 \(\mu_{\mathrm{eff}}\) 由层流贡献和湍流贡献共同组成，
+并采用 Fluent CFD 软件包内置的可实现 \(k\)-\(\varepsilon\) 湍流模型计算。
+式（3）中的 \(\alpha_i\rho_i\vect{g}\) 为浮力项，其中 \(\vect{g}\) 为重力矢量。
+\(\kappa_{ji}\vect{v}_r\) 是相间摩擦项，即两相间的阻力，
+其中 \(\vect{v}_r\) 为两相之间的滑移速度矢量。
+由体积分数梯度驱动的相间质量扩散会产生如下动量交换项：
+\[
+  \kappa_{ji}\left(
+  \frac{D_j}{\sigma_{ji}\alpha_j}\nabla\alpha_j
+  -\frac{D_i}{\sigma_{ji}\alpha_i}\nabla\alpha_i
+  \right),
+\]
+其中 \(D\) 为扩散率，\(\sigma\) 为弥散普朗特数。
+
+式（3）中的相间交换系数 \(\kappa_{ji}\) 可写成如下通用形式：
+\begin{equation}
+  \kappa_{ji}=\frac{\alpha_i\alpha_j\rho_j f}{\tau_j},
+\end{equation}
+其中阻力函数 \(f\) 定义为
+\begin{equation}
+  f=\frac{C_D\mathrm{Re}}{24},
+\end{equation}
+而阻力系数为
+\begin{equation}
+  C_D=
+  \begin{cases}
+    24\left(1+0.15\mathrm{Re}^{0.687}\right)/\mathrm{Re},
+      & \mathrm{Re}\leq 1000,\\
+    0.44, & \mathrm{Re}>1000.
+  \end{cases}
+\end{equation}
+\(\mathrm{Re}\) 是气泡直径 \(d\) 的函数。本研究假设气泡直径为恒定的 \(100~\mu\mathrm{m}\)。
+
+\subsection{离子组分输运与电势场}
+
+即使在层流条件下，气泡悬浮液的混合作用通常也远强于分子扩散，
+因此本研究假设离子组分浓度基本均匀。由此，电势场满足
+\begin{equation}
+  \nabla\cdot\left(\sigma^{\mathrm{eff}}\nabla\phi_i\right)=0 ,
+\end{equation}
+其中 \(\sigma^{\mathrm{eff}}\) 为电解液的有效电导率，可采用 Bruggeman 修正计算：
+\begin{equation}
+  \sigma^{\mathrm{eff}}=\sigma_0(1-\alpha)^{1.5}.
+\end{equation}
+
+式（7）通过 Fluent 的用户自定义标量功能求解。与式（7）对应的边界条件为
+\begin{align}
+  x=0,\qquad
+  i_c&=-i_{0,c}\left(1-\alpha_{\mathrm{H_2}}\right)
+  \exp\left(-\frac{F}{2RT}\eta_c\right), \\
+  x=w,\qquad
+  i_a&=i_{0,a}\left(1-\alpha_{\mathrm{O_2}}\right)
+  \exp\left(-\frac{F}{2RT}\eta_a\right).
+\end{align}
+其中 \(i_0\) 为交换电流密度，\((1-\alpha)\) 表示电极表面气泡覆盖导致的有效反应面积缩减；
+过电势 \(\eta\) 定义为
+\begin{equation}
+  \eta=\phi_e-\phi_i-U ,
+\end{equation}
+其中 \(\phi_c\) 为电势，\(U\) 为开路电势。计算所采用各常数的数值列于表~\ref{tab:constants}。
+
+模型中的流体动力学部分与电化学部分，通过连续性方程中的源项以及气泡造成的电解液空隙率相互耦合。
+阴极产生的氢气质量依据局部电流密度，利用法拉第第一电解定律计算。
+所得氢气质量作为氢气连续性方程中的质量“源”项。
+类似地，阳极产生的氧气质量由局部电流密度计算，并作为相应连续性方程中的质量“源”项。
+水的质量“汇”项同样依据法拉第第一电解定律计算，并加入水的连续性方程。
+利用这些源/汇项得到的空隙率，再用于计算新的局部电流密度。
+
+\begin{table}[htbp]
+  \centering
+  \caption{计算中所用常数的数值。}
+  \label{tab:constants}
+  \begin{tabular}{>{\centering\arraybackslash}p{3.2cm} p{5.3cm}}
+    \toprule
+    符号 & 数值\\
+    \midrule
+    \(\rho_l\) & \(1050~\mathrm{kg/m^3}\)\\
+    \(d\) & \(100\times10^{-6}~\mathrm{m}\)\\
+    \(\sigma_0\) & \(50\text{--}100~\mathrm{S/m}\)\\
+    \(i_0\) & \(0.2~\mathrm{A/m^2}\)\\
+    \(U\) & \(1.29~\mathrm{V}\)\\
+    \(T\) & \(20\text{--}60~^\circ\mathrm{C}\)\\
+    \(F\) & \(96487~\mathrm{C/mol}\)\\
+    \(R\) & \(8.314~\mathrm{J/mol}\)\\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\section{实验细节}
+
+在一套 \(5''\times5''\) 的方形平行板分隔式或非分隔式流动电解槽中，
+记录电流--槽电压曲线。电解槽配置 Raney 镍阴极和 204 不锈钢阳极。
+采用 Xantrex XHR 20--50 电源作为直流电源，在 \(20\text{--}60~^\circ\mathrm{C}\) 范围内获取实验数据。
+电催化阴极采用丝弧沉积法，在 204 不锈钢基底上共沉积镍--锌或镍--铝制备。
+随后，使 \(60~^\circ\mathrm{C}\) 的 30\% KOH 溶液循环 6--24 小时，
+通过浸出去除电极表面的大部分锌或铝。
+阳极材料为 204 不锈钢，有效电极表面积为 \(161~\mathrm{cm^2}\)。
+以去离子水稀释 Fisher Certified 的 45\%（质量分数）KOH 溶液，
+配制 30\%（质量分数）的 KOH 溶液。
+
+在典型实验中，使温度为 \(20\text{--}60~^\circ\mathrm{C}\) 的 30\% KOH 溶液
+以最高 \(2~\mathrm{L/min}\) 的流量通过电解槽循环。
+电流每次增加 \(5~\mathrm{A}\)，并手动记录各电流下的槽电压。
+这些实验的典型结果见下文图示。
+
+\section{结果与讨论}
+
+碱性电解涉及多相流、电化学反应和离子输运，其物理过程非常复杂。
+因此，本模型建立在一个简单的二维（2D）区域上。
+这类二维模型的物理有效性可以快速检查，
+还可通过小尺度的简单实验方便地进行验证。
+模型一旦建立并验证，将其扩展到三维并不困难。
+
+采用 \(30\times127\) 和 \(75\times250\) 个单元对程序进行网格无关性验证。
+两种网格得到的结果（为简洁起见未在文中给出）基本相同，
+但细网格计算所需的计算量约为粗网格的 5 倍。
+因此，出于计算经济性的考虑，后续计算均采用粗网格。
+模型预测的平均电流密度，与上一节所述单槽实验装置得到的实验结果进行了比较，如图~\ref{fig:validation} 所示。
+可以看到，在所考察的电解槽高度和槽电压范围内，预测结果与实验观测吻合良好，
+从而验证了模型的实验有效性。
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\textwidth]{fig02_validation.png}
+  \caption{模型预测结果与实验观测结果的比较。}
+  \label{fig:validation}
+\end{figure}
+
+图~\ref{fig:h2}（a）给出了长度为 \(127~\mathrm{mm}\) 的电极通道内，
+若干竖直截面上的 \(\mathrm{H_2}\) 分布；
+图~\ref{fig:h2}（b）给出了电极通道内若干条 \(y=\text{常数}\) 直线上的
+\(\mathrm{H_2}\) 体积分数剖面。
+正如预期，沿 \(+y\) 方向移动时，
+由于 \(\mathrm{H_2}\) 在水平方向上的扩散，电极通道内的 \(\mathrm{H_2}\) 体积分数逐渐增加。
+图~\ref{fig:profiles} 给出了沿阴极方向的 \(\mathrm{H_2}\) 体积分数和电流密度变化。
+由于电解液沿 \(+y\) 方向流动产生对流作用，气体沿电极方向不断积聚；
+这种积聚使电流密度沿电极方向逐渐降低。
+这些符合直觉的预测与 Dahlkild\textsuperscript{[1]}、
+Mat 等\textsuperscript{[3]} 以及 Mat 和 Aldas\textsuperscript{[2]} 的结果一致。
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\textwidth]{fig03_h2_fraction.png}
+  \caption{电极通道内 \(\mathrm{H_2}\) 体积分数的变化。}
+  \label{fig:h2}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.88\textwidth]{fig04_electrode_profiles.png}
+  \caption{沿电极方向的电流密度与 \(\mathrm{H_2}\) 体积分数变化。}
+  \label{fig:profiles}
+\end{figure}
+
+Nagai 等\textsuperscript{[4]} 报道，在使用静止电解液的碱性电解槽中，
+最优极间距为 \(1\text{--}2~\mathrm{mm}\)。
+在电解液流动时，最优极间距预计会小得多；
+此外，随着电解液流量增加，该最优极间距会显著减小。
+
+如图~\ref{fig:gap} 所示，本文 CFD 模型很好地捕捉了这一现象。
+在给定入口速度下，随着极间距减小，平均电流密度先增加，
+但这种趋势只持续到某一临界极间距。
+电流密度的增加可归因于离子流动阻力的降低：
+极间距缩短后，离子从阴极到达阳极所需经过的距离减小。
+当极间距小于这一临界值后，严重的气体积聚使平均电流密度下降。
+积聚的气体会大面积覆盖电极有效反应区，同时阻碍离子由阴极向阳极输运。
+图~\ref{fig:gap} 还清楚表明，临界极间距随流量增加而减小；
+这是因为在较高流量下，气相所受到的对流携带作用更强。
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.82\textwidth]{fig05_gap_effect.png}
+  \caption{给定入口速度下，平均电流密度随极间距的变化。
+  符号表示模型预测，曲线仅用于辅助说明。}
+  \label{fig:gap}
+\end{figure}
+
+作者利用这一经过验证的模型研究了电极形状对碱性电解槽性能的影响。
+该项工作形成了一种新型电极，并已就该电极提交美国专利申请
+（Ravichandra 等\textsuperscript{[5]}）。
+该研究的概要将另文发表。
+此外，在此模型的辅助下设计的碱性电解槽获得了美国
+\emph{Popular Mechanics} 杂志评选的 2006 年“创新突破奖”。
+
+作者还按照类似思路开发了三维模型，
+有关其开发与结果的论文正在准备投稿。
+该三维模型将成为碱性电解槽设计与优化中非常有价值的工具。
+作者还计划把三维单槽模型扩展到碱性电解槽堆：
+将 CFD 模型与其预测旁路电流的模型
+（Ravichandra 等\textsuperscript{[6]}）耦合。
+
+\section{结论}
+
+本文利用 Fluent 6.2 中的欧拉--欧拉两相流模型，
+建立了描述碱性电解多相流动的计算流体力学模型，
+并通过 Fluent 的 UDF（用户自定义函数）功能引入电化学过程。
+通过网格加密研究以及与内部实验数据的对比，
+对模型中包含的电解槽物理过程进行了验证。
+
+模型预测，在任一给定电解液流量下均存在最优极间距，
+且最优极间距随流量增加而减小。
+该模型可作为碱性电解单槽和槽堆设计与优化中的实用工具。
+
+\section*{致谢}
+
+本文第一作者受通用电气公司可持续能源先进技术计划资助。
+第二、第三作者衷心感谢美国能源部通过项目编号 DE-FC-14223 提供的经费支持。
+
+\noindent\textbf{免责声明：}
+“本报告是对一项部分由美国政府机构资助的工作的说明。
+美国政府、其任何机构及其任何雇员均不作任何明示或暗示的保证，
+也不对所披露的任何信息、设备、产品或工艺的准确性、完整性或实用性承担任何法律责任，
+亦不声明其使用不会侵犯私人拥有的权利。
+本文引用任何具体商业产品、工艺或服务的商品名、商标、制造商或其他信息，
+不一定构成或意味着美国政府或其任何机构对其认可、推荐或偏好。
+本文作者表达的观点和意见不一定代表或反映美国政府或其任何机构的观点和意见。”
+
+\section*{参考文献}
+
+\begin{enumerate}[label={[\arabic*]},leftmargin=2.6em,itemsep=0.25em]
+  \item A.~A. Dahlkild, \emph{J. Fluid Mechanics}, 428, 249 (2001).
+  \item M. Mat, K. Aldas, \emph{Int. J. Hydrogen Energy}, 30, 411 (2005).
+  \item M. Mat, K. Aldas, O.~J. Ilegbusi,
+    \emph{Int. J. Hydrogen Energy}, 29, 1015 (2004).
+  \item N. Nagai, M. Takeuchi, T. Kimura, T. Oka,
+    \emph{Int. J. Hydrogen Energy}, 28, 35 (2003).
+  \item J.~S. Ravichandra, R. Bourgeois, H. Zhang.
+    United States Patent and Trade Mark Office Application \#20080135402,
+    Class 204244 (USPTO) (2008).
+  \item J.~S. Ravichandra, G. Zappi, R. Bourgeois,
+    \emph{J. Applied Electrochemistry}, 37(8), 921 (2007).
+\end{enumerate}
+
+\vfill
+\begin{center}
+\small\itshape
+翻译依据：用户提供的原始 PDF。公式编号、图号、表号及参考文献顺序均与原文保持一致；
+图内英文标注保留原貌。
+\end{center}
+
+\end{document}

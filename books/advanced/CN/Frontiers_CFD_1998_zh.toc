@@ -1,0 +1,25 @@
+\contentsline {chapter}{\numberline {第一章\hspace {.3em}}回顾Earll Murman对跨声速流动和计算流体动力学的贡献}{5}{chapter.4}%
+\contentsline {chapter}{\numberline {第二章\hspace {.3em}}最佳高超音速锥翼}{19}{chapter.5}%
+\contentsline {chapter}{\numberline {第三章\hspace {.3em}}理论、应用和教育流体动力学的几何}{23}{chapter.6}%
+\contentsline {chapter}{\numberline {第四章\hspace {.3em}}轴对称喷管流动的计算}{27}{chapter.7}%
+\contentsline {chapter}{\numberline {第五章\hspace {.3em}}超聚焦声爆问题的分析和数值模拟}{30}{chapter.8}%
+\contentsline {chapter}{\numberline {第六章\hspace {.3em}}跨声速流动的复杂分析}{44}{chapter.9}%
+\contentsline {chapter}{\numberline {第七章\hspace {.3em}}跨声速小横向扰动方程及其计算}{50}{chapter.10}%
+\contentsline {chapter}{\numberline {第八章\hspace {.3em}}边界层流动中绝对不稳定扰动的激发}{54}{chapter.11}%
+\contentsline {chapter}{\numberline {第九章\hspace {.3em}}在误差分析的伴随方程和CFD中的最优网格自适应上}{59}{chapter.12}%
+\contentsline {chapter}{\numberline {第十章\hspace {.3em}}在流程计算中增加了耗散}{65}{chapter.13}%
+\contentsline {chapter}{\numberline {第十一章\hspace {.3em}}用于Euler 方程的四运算器守恒格式}{69}{chapter.14}%
+\contentsline {chapter}{\numberline {第十二章\hspace {.3em}}带有分体和铉法兰襟翼的自动阻挡}{72}{chapter.15}%
+\contentsline {chapter}{\numberline {第十三章\hspace {.3em}}局部预处理：操纵大自然母亲愚弄父亲的时间}{76}{chapter.16}%
+\contentsline {chapter}{\numberline {第十四章\hspace {.3em}}放松重温--重新审视稳定流动的多网格}{86}{chapter.17}%
+\contentsline {chapter}{\numberline {第十五章\hspace {.3em}}并行计算机上的航空航天工程模拟}{93}{chapter.18}%
+\contentsline {chapter}{\numberline {第十六章\hspace {.3em}}优化CFD代码和算法，以便在Cray计算机上使用}{98}{chapter.19}%
+\contentsline {chapter}{\numberline {第十七章\hspace {.3em}}使用Nsmb结构化多块求解器在空气动力学中的最新应用}{104}{chapter.20}%
+\contentsline {chapter}{\numberline {第十八章\hspace {.3em}}航空航天应用及其他领域的不可压缩的Navier-Stokes计算}{116}{chapter.21}%
+\contentsline {chapter}{\numberline {第十九章\hspace {.3em}}翼型优化的利弊}{126}{chapter.22}%
+\contentsline {chapter}{\numberline {第二十章\hspace {.3em}}迈向工业实力的Navier-Stokes守则--重温}{132}{chapter.23}%
+\contentsline {chapter}{\numberline {第二十一章\hspace {.3em}}我们从计算流体动力学火车空气动力学研究中学到了什么？}{137}{chapter.24}%
+\contentsline {chapter}{\numberline {第二十二章\hspace {.3em}}与CFD一起追求价值}{143}{chapter.25}%
+\contentsline {chapter}{\numberline {第二十三章\hspace {.3em}}十字路口的CFD：行业视角}{148}{chapter.26}%
+\contentsline {chapter}{\numberline {第二十四章\hspace {.3em}}航空航天工程2000：综合实践课程}{158}{chapter.27}%
+\contentsline {chapter}{\numberline {第二十五章\hspace {.3em}}流体力学入门型计算机教科书}{165}{chapter.28}%

@@ -1,0 +1,267 @@
+\documentclass[UTF8,11pt,a4paper,fontset=fandol]{ctexart}
+\usepackage[margin=2.25cm]{geometry}
+\usepackage{amsmath,amssymb,bm,booktabs,array,longtable,graphicx,float,caption,xcolor,hyperref,microtype}
+\usepackage{siunitx}
+\sisetup{detect-all,per-mode=symbol}
+\graphicspath{{zhang2013_zh_figures/}}
+\hypersetup{hypertexnames=false,colorlinks=true,linkcolor=blue!55!black,urlcolor=blue!60!black,citecolor=blue!55!black}
+\captionsetup{font=small,labelfont=bf}
+\setlength{\parindent}{2em}
+\setlength{\parskip}{0.25em}
+\renewcommand{\figurename}{图}
+\renewcommand{\tablename}{表}
+
+\title{铝电解过程气泡动力学的计算流体动力学（CFD）模拟\\\large 中文翻译稿}
+\author{Kaiyu Zhang（张凯宇），Yuqing Feng（冯玉清），Phil Schwarz，\\Zhaowen Wang（王兆文），Mark Cooksey}
+\date{原文 DOI：\href{https://doi.org/10.1021/ie303464a}{10.1021/ie303464a}\\收稿：2012-12-15；修订并接受：2013-05-07}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+本文提出一种微观尺度建模方法，用于研究铝电解过程中的气泡动力学。采用计算流体动力学（CFD）模型，并以流体体积（VOF）法捕捉气泡形状，对单个气泡的运动进行研究。以实际电解槽局部区域的二维几何为计算域，分别模拟空气--水体系和 $\mathrm{CO_2}$--冰晶石体系中不同尺寸气泡的运动，并从阳极下方滑移、在阳极边缘释放以及在侧部通道中上升三个阶段进行比较。两种体系表现出相似的总体规律，例如气泡滑移速度随气泡尺寸增大而提高，大气泡会形成较厚的头部；但在各阶段的气泡形态、滑移速度、气泡层厚度以及气泡诱导液相流动等定量细节上存在差异。该微观尺度模拟可为多尺度建模提供组成关系，从而支撑宏观或过程尺度模型的建立。
+
+\noindent\textbf{关键词：}铝电解；气泡动力学；计算流体动力学；流体体积法；冰晶石；多尺度模拟
+\end{abstract}
+
+\section{引言}
+Hall--H\'eroult 法是目前唯一商业化的原铝生产工艺。在铝电解槽中，氧化铝加入约 \SI{970}{\degreeCelsius} 的熔融冰晶石电解质并溶解，多块炭阳极浸没其中。阳极与下方阴极之间通入电流，使氧化铝发生电化学还原，生成的铝沉积于阴极上方的铝液层中。反应在阳极处生成 $\mathrm{CO_2}$ 气泡；气泡受浮力作用穿过熔融冰晶石浴并诱发循环流动。由于冰晶石会溶解多数潜在的槽壁材料，必须在槽壁形成凝固的冰晶石侧部结壳以容纳熔体，因而电解槽需要维持精细的热平衡，而浴液循环对这一热平衡具有重要影响。
+
+气体在阳极底面连续生成，因而底面下方覆盖一层气泡。气泡覆盖率可达 30--90\%，并造成额外电压降；Haupin 报道气泡使电解质中的额外压降达到 0.15--\SI{0.35}{V}。阳极下方的气泡运动还会激发浴液--铝液界面波动、引起电压波动和局部高电流密度，并间接导致磁场不稳定。与此同时，全槽尺度的浴液流动和氧化铝混合与气泡行为密切相关。因此，详细掌握气泡动力学及其诱导的浴液流动，是定量评估气泡对槽性能影响的基础。
+
+工业槽内的高温和腐蚀性熔盐环境限制了直接观测。工业槽、实验槽和物理模型中的气泡研究表明，工业槽气泡层厚度至少约为 \SI{5}{mm}，实验槽结果与之相近。室温透明物理模型通常以有机玻璃构槽，以室温液体替代冰晶石。已有替代体系包括 NaOH 溶液--氧气、硫酸铜溶液--氧气、空气--油--水，以及最常见的空气--水体系。由于气泡形成同时受表面张力、接触角、阳极形状乃至表面粗糙度影响，没有一种室温体系能完全再现真实体系。选用空气--水体系的重要依据是水与冰晶石的运动黏度相近；在相同供气体积下，这可能给出相近的液相流动，却并不保证气泡动力学相似。
+
+气泡形态主要取决于液体的 Morton 数和 E\"otv\"os 数：
+\[
+ \mathrm{Mo}=\frac{g\mu_l^4(\rho_l-\rho_g)}{\rho_l^2\sigma^3},\qquad
+ \mathrm{Eo}=\frac{g(\rho_l-\rho_g)L^2}{\sigma},
+\]
+其中 $g$ 为重力加速度，$\mu$ 为动力黏度，$\rho$ 为密度，$\sigma$ 为表面张力，$g$、$l$ 下标分别表示气相与液相，$L$ 为特征长度（本文取气泡等效直径 $d_b$）。两体系的 Morton 数差异显著，但浮力与表面张力之比相近，因此在给定气泡尺寸下 E\"otv\"os 数相近。
+
+气液流动可在单气泡微观尺度或局部平均的宏观尺度上建模。微观模型解析每个气泡界面，可获得详细瞬态行为，但计算量大；宏观模型求解时间平均流场，计算成本较低，其精度却依赖由微观信息导出的气泡诱导湍流、湍流扩散力等组成关系。本文在早期工作的基础上，进一步比较空气--水与 $\mathrm{CO_2}$--冰晶石体系在阳极边缘释放和侧部通道上升阶段的差异，并定量考察气泡诱导液相运动。本文同时修正了早期数据处理问题，并采用优化后的注气方法重新计算。
+
+\begin{table}[H]
+\centering\small
+\caption{文献中用于模拟 $\mathrm{CO_2}$--冰晶石体系的代表性相似体系}
+\begin{tabular}{lll}
+\toprule 浴液 & 气体 & 其他相/说明\\ \midrule
+NaOH 溶液 & 氧气 & 无\\
+硫酸铜（蓝矾）溶液 & 氧气 & 无\\
+轻质矿物油 & 空气 & 水\\
+水 & 空气 & 无（最常用）\\
+油 & 空气 & 无\\
+水--0.5\% 丁醇 & 空气 & 无\\
+丙醇--水、异丙醇--水、甘油--水 & 空气 & 无\\
+橄榄油 & 空气 & 无\\
+水 & 空气 & 有机液相\\ \bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[H]
+\centering\small
+\caption{$\mathrm{CO_2}$--冰晶石与空气--水体系的物性参数}
+\resizebox{\textwidth}{!}{\begin{tabular}{lcccc}
+\toprule 参数 & $\mathrm{CO_2}$（\SI{960}{\degreeCelsius}） & 冰晶石（\SI{960}{\degreeCelsius}） & 空气（\SI{25}{\degreeCelsius}） & 水（\SI{25}{\degreeCelsius}）\\ \midrule
+密度/\si{kg.m^{-3}} & 0.4 & 2100 & 1.225 & 998.2\\
+动力黏度/\si{kg.m^{-1}.s^{-1}} & $1.37\times10^{-5}$ & $3.0\times10^{-3}$ & $1.789\times10^{-5}$ & $1.003\times10^{-3}$\\
+运动黏度/\si{m^2.s^{-1}} & $3.43\times10^{-5}$ & $1.43\times10^{-6}$ & $1.46\times10^{-5}$ & $1.005\times10^{-6}$\\
+表面张力/\si{N.m^{-1}} & \multicolumn{2}{c}{0.132} & \multicolumn{2}{c}{0.072}\\
+接触角 & \multicolumn{2}{c}{$120^\circ$} & \multicolumn{2}{c}{$60^\circ$}\\
+Morton 数 & \multicolumn{2}{c}{$1.645\times10^{-10}$} & \multicolumn{2}{c}{$2.664\times10^{-11}$}\\
+E\"otv\"os 数（$d_b=0.0113/0.0226/0.0339$ m） & \multicolumn{2}{c}{19.904/79.626/158.624} & \multicolumn{2}{c}{17.294/69.175/137.820}\\ \bottomrule
+\end{tabular}}
+\end{table}
+
+\section{CFD 建模方法}
+\subsection{模型描述}
+自由界面会发生不规则变形，并可能出现气泡破裂、翻转和飞溅，因此采用贴体移动网格的界面追踪法往往需要频繁重构网格，计算代价很高。本文采用固定网格上的界面捕捉方法，即 ANSYS Fluent 中的流体体积（VOF）法，并通过几何重构格式和自适应网格细化捕捉气液界面。
+
+VOF 法假设各流体相互不贯穿。每个控制体内用相体积分数 $\alpha$ 表示相占据的体积；各相共享体积平均后的场变量与物性。每一相满足质量守恒：
+\begin{equation}
+ \frac{\partial \alpha}{\partial t}+\nabla\cdot(\alpha\bm v)=0 .
+ \tag{1}
+\end{equation}
+液相作为主相时不单独求解其体积分数，而由约束
+\begin{equation}
+ \alpha_g+\alpha_l=1
+ \tag{2}
+\end{equation}
+确定。两相共享一组动量方程：
+\begin{equation}
+ \frac{\partial(\rho\bm v)}{\partial t}+\nabla\cdot(\rho\bm v\bm v)
+ =-\nabla P+\nabla\cdot\left[\mu\left(\nabla\bm v+(\nabla\bm v)^{\mathrm T}\right)\right]+\rho\bm g+\bm F,
+ \tag{3}
+\end{equation}
+其中 $P$ 为压力，$\bm F$ 为以体积力形式加入的表面张力项。混合物密度和动力黏度分别按体积分数平均：
+\begin{align}
+ \rho&=\alpha_g\rho_g+\alpha_l\rho_l, \tag{4}\\
+ \mu&=\alpha_g\mu_g+\alpha_l\mu_l. \tag{5}
+\end{align}
+界面附近的插值方式会影响式（1）和式（3）中的对流、扩散通量以及表面张力，因此本文采用几何重构和网格自适应提高界面解析精度。
+
+\begin{figure}[H]\centering
+\includegraphics[width=0.94\textwidth]{fig01.png}
+\caption{CFD 模型的几何与网格信息：（a）几何；（b）初始网格；（c）气泡周围的细化网格（左）及自适应后气液界面附近的网格（右）。}
+\end{figure}
+
+\subsection{模拟条件}
+受计算时间和成本限制，本文采用二维几何。二维模型不能完整代表真实三维行为，但在两体系采用相同条件时，可用于比较总体规律。计算域代表典型预焙 Hall--H\'eroult 电解槽的一个切片，并不对应某一具体槽型。阳极--阴极距离（ACD）为 \SI{50}{mm}，阳极与侧壁之间的侧部通道宽 \SI{240}{mm}；考虑阳极消耗可能造成的倾斜，阳极底面设置 $1.5^\circ$ 倾角。
+
+气体从阳极底面长 \SI{5}{mm} 的入口注入，入口中心距左端 \SI{25}{mm}，入口速度为 \SI{0.25}{m.s^{-1}}。注气时间分别为 0.08、0.32 和 \SI{0.64}{s}，形成等效直径约为 11.3、22.6 和 \SI{33.9}{mm} 的二维气泡。注入规定气量后，入口改为无滑移壁面。文中“气泡尺寸”均指初始注入气泡的二维等效直径。
+
+初始网格含 1624 个四边形单元。采用悬挂节点自适应方法，使网格在界面经过时细化、离开后粗化；最大和最小单元面积分别为 $5\times10^{-6}$ 和 $6\times10^{-9}\ \si{m^2}$。初始时间步为 $5\times10^{-5}\ \si{s}$，全局最大 Courant 数为 0.15，收敛判据为 $10^{-7}$。采用瞬态、压力基、绝对速度格式以及层流模型；压力--速度耦合和界面重构均按 Fluent 的瞬态 VOF 设置执行。
+
+\begin{table}[H]\centering
+\caption{不同初始气泡尺寸的模拟工况}
+\begin{tabular}{clc}\toprule 工况 & 体系 & 等效气泡直径/\si{m}\\ \midrule
+1 & 空气--水 & 0.0113\\ 2 & $\mathrm{CO_2}$--冰晶石 & 0.0113\\
+3 & 空气--水 & 0.0226\\ 4 & $\mathrm{CO_2}$--冰晶石 & 0.0226\\
+5 & 空气--水 & 0.0339\\ 6 & $\mathrm{CO_2}$--冰晶石 & 0.0339\\ \bottomrule
+\end{tabular}
+\end{table}
+
+\section{结果与讨论}
+气泡行为可分为三个阶段：阳极下方滑移、阳极边缘释放以及侧部通道内上升。以下分别讨论。
+
+\subsection{阳极下方的气泡滑移}
+\subsubsection{气泡形态}
+注气后单气泡逐渐长大；尺寸足够大时，沿阳极底面向较高的一端滑移，并很快达到动态稳定状态。图 2 给出六个工况在稳定后的三个时刻。小气泡的比表面积较大，单位气体体积受到的表面张力更强，因而形状更接近圆形。气泡形态实际由表面张力、浮力、气液黏性摩擦、固壁摩擦和接触角共同决定。所有工况中的气泡均被压扁，厚度小于长度；随着尺寸增大，形状愈加不规则，形成厚头部与细长尾部，这与铝电解槽、重力流和密度流研究中的观测一致。
+
+\begin{figure}[H]\centering\includegraphics[width=0.96\textwidth]{fig02.png}
+\caption{工况 1--6 达到动态稳定状态后，在三个时刻的 ACD 内气泡形态。工况 1、3、5 为空气--水体系，工况 2、4、6 为 $\mathrm{CO_2}$--冰晶石体系；初始气泡直径依次为 11.3、22.6、\SI{33.9}{mm}。所有图采用相同位置和尺度。}
+\end{figure}
+
+\subsubsection{气泡层厚度}
+两体系的平均气泡厚度均随气泡直径增大。相同直径下，空气--水体系厚度约 4--\SI{5}{mm}，而 $\mathrm{CO_2}$--冰晶石体系约为 \SI{3}{mm}。单气泡模型的结果与连续注气实验所得厚度在量级上相符。
+
+\begin{figure}[H]\centering\includegraphics[width=0.62\textwidth]{fig03.png}
+\caption{不同体系中平均气泡厚度随气泡直径的变化。}
+\end{figure}
+
+对于下向固体表面下方的静止气泡，随体积增加，气泡高度先增至最大值，随后略微降低并趋于极限高度。经验关系为
+\begin{equation}
+ h_{\max}=\left[-0.19(\pi-\theta)^2+1.293(\pi-\theta)-0.053\right]
+ \left[\frac{\sigma}{(\rho_l-\rho_g)g}\right]^{1/2},
+ \tag{6}
+\end{equation}
+\begin{equation}
+ h_{\lim}=2\left[1-\cos(\pi-\theta)\right]
+ \left[\frac{\sigma}{(\rho_l-\rho_g)g}\right]^{1/2},
+ \tag{7}
+\end{equation}
+其中 $\theta$ 为接触角。因本文倾角很小，平板关系仍可用于比较。由式（6）和式（7）计算，$\mathrm{CO_2}$--冰晶石中最大及极限高度分别为 2.8、\SI{2.5}{mm}，空气--水中分别为 4.9、\SI{4.7}{mm}。模拟值处于经验关系的合理范围内，但模拟显示了经验式未包含的尺寸效应。两体系中根式项数值相近，而系数取决于接触角，说明接触角主导了两体系气泡厚度的差异，并且接触角越大，其影响越敏感。
+
+\begin{figure}[H]\centering\includegraphics[width=0.56\textwidth]{fig04.png}
+\caption{接触角对式（6）与式（7）右端系数的影响。}
+\end{figure}
+
+\subsubsection{气泡滑移速度与阻力系数}
+动态稳定状态下的平均滑移速度随气泡尺寸增大。气泡体积增大时浮力随体积线性提高，而表面积不按同一比例增长，单位气体体积所受表面摩擦减小，故大气泡滑移更快。相同尺寸下，$\mathrm{CO_2}$--冰晶石体系的气泡更薄、头部阻力更小，速度高于空气--水体系。CFD 结果处于既有空气--水倾斜通道实验的合理范围；但实验倾角为 $2.0^\circ$，本文二维模型为 $1.5^\circ$，严格定量验证仍需同条件三维模拟。
+
+\begin{figure}[H]\centering\includegraphics[width=0.58\textwidth]{fig05.png}
+\caption{不同体系中平均滑移速度随气泡直径的变化。}
+\end{figure}
+
+气泡诱导电压降同时取决于阳极覆盖面积和气泡层厚度，其中覆盖面积作用更强。相同气泡尺寸下，$\mathrm{CO_2}$--冰晶石体系的覆盖面积更大，但空气--水体系气泡更厚、滑速更低、阳极下停留时间更长。因此，比较气泡电压降时必须综合考虑覆盖面积和滑移速度。
+
+将气泡按三维球形经验形式处理，其阻力系数写为
+\begin{equation}
+ C_d=\frac{4}{3}\frac{\rho_l-\rho_g}{\rho_l}\frac{d_b g}{v^2}\sin\phi,
+ \tag{8}
+\end{equation}
+其中 $\phi$ 为阳极底面倾角。相同尺寸下，空气--水体系的 $C_d$ 大于 $\mathrm{CO_2}$--冰晶石体系。两个较大气泡的阻力系数变化不大；最小尺寸处，两体系趋势相反，这可能与 $\mathrm{CO_2}$--冰晶石小气泡发生更显著变形有关。Ishii--Zuber 关系给出的自由上升气泡区阻力系数约为 2.67，而 $\mathrm{CO_2}$--冰晶石中倾斜表面下滑移的阻力系数约小一个数量级。该结果说明，过程尺度局部平均模型不应简单沿用竖直上升阻力，而应建立 ACD 区域专用的界面动量交换关系。
+
+\begin{figure}[H]\centering\includegraphics[width=0.58\textwidth]{fig06.png}
+\caption{不同体系中气泡阻力系数随气泡尺寸的变化。}
+\end{figure}
+
+\subsubsection{气泡周围及内部的流动动力学}
+氧化铝主要在 ACD 区域消耗，必须由周围浴液持续输运进入该区。气泡诱导液流被认为是 ACD 内氧化铝混合的主要驱动力。流线显示，平行于阳极底面的浮力分量推动气泡滑移，垂直分量则使气泡扁平。气泡头部将前方液体推开，液体从气泡下方回流以填补尾部离开的空间；紧贴气液界面的液体又因界面剪切向前运动，从而形成局部循环。气泡越大，气液动量交换越强，局部回流越显著。
+
+\begin{figure}[H]\centering\includegraphics[height=0.72\textheight]{fig07.png}
+\caption{工况 1--6 中气泡周围液相流线。}
+\end{figure}
+
+气泡内部速度远高于周围液体，前方液体阻碍气体前进并在头部前形成较大的动压梯度。该梯度一部分驱动液体向前、一部分驱动其向下，促成厚头部。气泡越大，内部气体速度和动压梯度越高。界面剪切引起的前向液流与头部下方回流相遇，形成明显的“鼻部”；局部旋涡区域则出现负动压。上述流动结构解释了不同气泡形态的形成机制。
+
+\begin{figure}[H]\centering\includegraphics[width=0.76\textwidth]{fig08.png}
+\caption{气泡整体区域（工况 1、2）或头部区域（工况 3--6）的流动动力学：左列为速度矢量，右列为动压分布。}
+\end{figure}
+
+\subsection{气泡在阳极边缘的释放}
+气泡接近阳极边缘时，水平动量使其继续前行；一旦摆脱阳极底面的约束，便在强浮力作用下转向上升。小气泡的尾部紧跟头部，通常以整体形式释放，阳极下方残留气体很少。较大气泡则分裂为多个部分：头部上升，尾部仍留在阳极下方。其原因是头部浮力与滑移尾部所受摩擦的合力超过由表面张力、黏度和尺寸等决定的气泡内聚能力。尽管大气泡会在阳极下留下较多气体，其释放部分仍大于小气泡。
+
+两体系的关键区别来自接触角：空气--水气泡倾向脱离阳极竖直壁，而 $\mathrm{CO_2}$--冰晶石气泡紧贴竖直壁。直径 \SI{22.6}{mm} 的工况 3 和 4 显示，释放过程中的气泡内部速度很高，运动剧烈；气液界面强剪切产生多种局部循环，最终造成气泡破裂并形成小气泡。
+
+\begin{figure}[H]\centering\includegraphics[width=0.96\textwidth]{fig09.png}
+\caption{气泡在阳极边缘逸出的连续快照：（a、c、e）空气--水；（b、d、f）$\mathrm{CO_2}$--冰晶石；对应气泡直径为 11.3、22.6、\SI{33.9}{mm}。}
+\end{figure}
+\begin{figure}[H]\centering\includegraphics[width=0.62\textwidth]{fig10.png}
+\caption{工况 3（空气--水，$d_b=\SI{22.6}{mm}$）气泡释放过程中四个时刻的速度矢量。}
+\end{figure}
+\begin{figure}[H]\centering\includegraphics[width=0.62\textwidth]{fig11.png}
+\caption{工况 4（$\mathrm{CO_2}$--冰晶石，$d_b=\SI{22.6}{mm}$）气泡释放过程中四个时刻的速度矢量。}
+\end{figure}
+
+\subsection{侧部通道中的气泡上升}
+阳极边缘的释放模式直接决定后续上升行为。小气泡在竖直运动中不发生破裂；较大气泡倾向分裂为多个小气泡，且子气泡在一段时间内紧随母气泡。空气--水气泡会完全脱离阳极并迅速远离；$\mathrm{CO_2}$--冰晶石气泡则沿阳极竖直边缘上升并保持贴壁。
+
+\begin{figure}[H]\centering\includegraphics[width=0.96\textwidth]{fig12.png}
+\caption{各工况气泡在侧部通道内三个时刻的形态：（a、c、e）空气--水；（b、d、f）$\mathrm{CO_2}$--冰晶石；对应气泡直径为 11.3、22.6、\SI{33.9}{mm}。}
+\end{figure}
+
+为比较体系与气泡尺寸对液流的影响，记录图 1 中三个测点的速度。点 1 位于阳极边缘正下方、ACD 间隙中部，记录水平速度；点 2、3 均位于自由液面下 \SI{75}{mm}，分别距阳极竖壁和外侧壁 \SI{5}{mm}，记录竖直速度。
+
+点 1 的负水平速度表示液体流入 ACD。气泡到达前液体近似静止；气泡通过后，液体补充气泡腾出的空间，流入 ACD 的速度骤增。总体而言，在相同尺寸下空气--水体系的峰值更高；气泡越大，需要补入的液体越多，速度也越高。$\mathrm{CO_2}$--冰晶石气泡滑移较快，因此更早引发液体流入 ACD。实际电解槽连续产气，液体将持续流入 ACD，并在气泡释放后间歇性流出。
+
+\begin{figure}[H]\centering\includegraphics[width=0.86\textwidth]{fig13.png}
+\caption{各工况点 1 的液相水平速度：（a）$d_b=0.0113$ m；（b）0.0226 m；（c）0.0339 m。}
+\end{figure}
+
+点 2 的负速度表示向下流。气泡通过时驱动液体向上，侧部通道中由强浮力诱导的流动明显强于 ACD 内流动，且大气泡产生更高速度。$\mathrm{CO_2}$--冰晶石体系出现尖锐的速度上升；空气--水体系的变化较缓，并同时出现上、下运动，这与其气泡脱离阳极竖壁有关。
+
+\begin{figure}[H]\centering\includegraphics[width=0.86\textwidth]{fig14.png}
+\caption{各工况点 2 的液相竖直速度：（a）$d_b=0.0113$ m；（b）0.0226 m；（c）0.0339 m。}
+\end{figure}
+
+液体在阳极附近上升，随后在自由液面下方转为水平向外壁流动，最后沿外壁向下回流，形成大尺度循环。因此点 3 的速度低于阳极附近点 2 的上升速度。连续注气预计将形成更高的总体循环强度。
+
+\begin{figure}[H]\centering\includegraphics[width=0.86\textwidth]{fig15.png}
+\caption{各工况点 3 的液相竖直速度：（a）$d_b=0.0113$ m；（b）0.0226 m；（c）0.0339 m。}
+\end{figure}
+
+本文仅研究单气泡，是铝电解气泡动力学研究的初始阶段。工业槽中大量气泡连续生成、相互作用并不断聚并与破裂，且气泡除交换动量外还会诱发有利于氧化铝混合的强湍流。尽管如此，只有先以实验数据仔细验证单气泡模型，才可能可靠地处理更复杂的多气泡问题。
+
+\section{结论}
+本文采用带自适应网格的 VOF--CFD 模型，在铝电解槽局部二维几何中研究空气--水和 $\mathrm{CO_2}$--冰晶石体系的三种尺寸单气泡。主要结论如下：
+\begin{enumerate}
+\item 两体系具有相似的总体规律：ACD 内滑移速度随气泡尺寸增大；大气泡形成厚头部；小气泡可整体越过阳极边缘，而大气泡在部分释放后易破裂。
+\item 阳极下滑移阶段，相同尺寸的 $\mathrm{CO_2}$--冰晶石气泡速度更高、厚度更小。
+\item 阳极边缘释放阶段，空气--水气泡倾向脱离阳极竖壁，$\mathrm{CO_2}$--冰晶石气泡则倾向附着于阳极竖直边缘。
+\item 侧部通道上升阶段，上述脱壁/贴壁差异持续存在，使两体系的界面动量交换发生在通道的不同区域。
+\item 气泡附近流动十分复杂：气泡内部速度超过前方液相速度，形成厚头部；气泡运动引起与其方向相反的液相回流，而界面剪切又驱动近界面液体沿气泡方向运动。接触角是导致两体系微观行为差异的关键参数。
+\end{enumerate}
+这些微观尺度结果可用于建立气泡阻力、气泡诱导混合等组成关系，改善工业电解槽宏观过程模型的精度。
+
+\section*{作者信息与致谢}
+通讯作者：Yuqing Feng。作者单位包括澳大利亚联邦科学与工业研究组织（CSIRO）数学、信息与统计部门，东北大学冶金工程学院，以及 CSIRO 过程科学与工程部门。作者感谢 CSIRO Light Metals National Research Flagship、澳大利亚政府 Endeavour Awards 和东北大学的支持。原文声明作者无竞争性经济利益。
+
+\section*{符号表}
+\begin{tabular}{ll@{\qquad}ll}
+$\alpha$ & 相体积分数 & $\rho$ & 密度\\
+$\mu$ & 动力黏度 & $\sigma$ & 表面张力\\
+$\bm v$ & 速度矢量 & $P$ & 压力\\
+$\bm F$ & 表面张力体积力 & $g$ & 重力加速度\\
+$d_b$ & 气泡等效直径 & $C_d$ & 阻力系数\\
+$\theta$ & 接触角 & $\phi$ & 阳极底面倾角\\
+$h_{\max}$ & 最大气泡高度 & $h_{\lim}$ & 极限气泡高度\\
+\end{tabular}
+
+\section*{参考文献说明}
+原文共列出 55 篇参考文献，正文中的研究背景和比较均依照原文引用顺序。为便于核对具体书目信息，请参阅英文原文第 12--13 页；本翻译稿不改动原文的著作权与引用归属。
+
+\vfill
+\begin{center}\small\color{gray}
+译注：本文档依据 Zhang 等（2013）英文论文制作。图像取自原文并保持原图编号；中文图题、公式编号与表格编号均与原文对应。
+\end{center}
+\end{document}

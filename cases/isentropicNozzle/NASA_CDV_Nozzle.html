@@ -1,0 +1,238 @@
+<HTML>
+<HEAD>
+   <TITLE> Converging-Diverging Verification (CDV) Nozzle </TITLE>
+<style type="text/css">
+<!--
+.style1 {color: #800000;
+         text-decoration: underline; }
+.style2 {weight: bold}
+.style3 {color: #800000;}
+
+-->
+</style>
+
+</HEAD>
+
+<BODY TEXT="#000000" BGCOLOR="#FFFFFF" LINK="#0000EE" 
+  VLINK="#551A8B" ALINK="#FF0000">
+
+
+<!---------------------------------------------------------------------->
+<B>NPARC Alliance CFD Verification and Validation Archive</B><BR>
+<B><A HREF="../homepage.html">
+V&amp;V Home</A></B> &nbsp; <B> &gt; </B> &nbsp; 
+<B><A HREF="../archive.html">
+Archive</A></B> &nbsp; <B> &gt; </B> &nbsp; 
+<B> Converging-Diverging Verification (CDV) Nozzle </B>
+
+<HR>
+
+
+<!---------------------------------------------------------------------->
+
+<H2 class="style3" align="center"> Converging-Diverging Verification (CDV) Nozzle 
+</H2>
+
+
+
+<!---------------------------------------------------------------------->
+<P align="CENTER">
+  <IMG SRC="cdvgeom.gif" alt="This figure is described in the text below"><BR>
+    <B>Figure 1. Converging-Diverging Verification (CDV) Nozzle (red is 
+    centerline).</B>  
+</p>
+
+
+<!---------------------------------------------------------------------->
+<H3 class="style1">Introduction</H3>
+
+<P> The Converging-Diverging Verification (CDV) Nozzle is a verfication 
+case involving the flow of inviscid, non-heat-conducting air through a 
+converging-diverging nozzle.  This is a classic one-dimensional, steady, 
+compressible flow problem discussed in most compressible flow textbooks, 
+such as Reference 1 by Anderson.  This case allows the verification of 
+a CFD code in the following manner: </P>
+
+<UL>
+
+<LI> verify through comparison with analytic solutions</LI>
+
+<LI> verify mass conservation through a duct</LI>
+
+<LI> verify of constancy of total pressure through a duct (isentropic flow)</LI>
+
+<LI> verify consistency of axisymetric and three-dimensional flow domains</LI>
+
+</UL>
+
+
+<!---------------------------------------------------------------------->
+<H3 class="style1">Flow Description</H3>
+
+<P> This case involves steady, inviscid, non-heat-conducting flow through a
+converging-diverging nozzle.  The plenum total pressure and total temperature 
+are assumed constant.  The values used in this case are presented in Table 
+1.  The nature of the flow is determined by
+the exit static pressure.  Three values of exit static pressure are 
+examined which result in three types of flows: </P>
+
+<OL>
+
+<LI> subsonic, isentropic flow (p<sub>exit</sub>/p<sub>t</sub>=0.89)</LI>
+
+<LI> supersonic flow with a normal shock in the diffusing section 
+     (p<sub>exit</sub>/p<sub>t</sub>=0.75)</LI>
+
+<LI> supersonic, isentropic flow (p<sub>exit</sub>/p<sub>t</sub>=0.16)</LI>
+
+</OL> 
+
+<P> For these exit static pressures, the flow is accelerated out the 
+nozzle.</P>
+
+
+<TABLE BORDER CELLPADDING=7 align="center">
+<CAPTION><B>Table 1. Flow conditions.</B></CAPTION>
+
+<TR>
+<TH scope="row">Plenum Total Pressure (psi)</TH>
+<TD> 1.0 </TD>
+</TR>
+
+<TR>
+<TH scope="row">Plenum Total Temperature (R)</TH>
+<TD> 100.0 </TD>
+</TR>
+
+<TR>
+<TH scope="row">Exit Static Pressures (psi)</TH>
+<TD> 0.89  <br>  0.75  <br>  0.16   </TD>
+</TR>
+
+</TABLE>
+
+
+<!---------------------------------------------------------------------->
+<H3 class="style1">Geometry</H3>
+
+<P> The geometry is an axisymmetric converging-diverging duct.  Figure
+1 shows the general shape of the nozzle.  It has an area of 2.5
+in<sup>2</sup> at the inflow (x = 0 in), an area of 1.0 in<sup>2</sup>
+at the throat (x = 5 in), and an area of  1.5 in<sup>2</sup> at the
+exit (x = 10 in).  The nozzle area variation uses a cosine function and 
+has the form</P>
+<pre>
+      if ( x .lt. 5.0 ) then
+        area = 1.75 - 0.75 * cos( ( 0.2 * x - 1.0 ) * pi )
+      else
+        area = 1.25 - 0.25 * cos( ( 0.2 * x - 1.0 ) * pi )
+      endif
+</pre>
+
+<P> This nozzle geometry is from Reference 2, which also discusses some
+CFD computations of this nozzle. </P> 
+
+
+<!---------------------------------------------------------------------->
+<H3 class="style1">Comparison Data</H3>
+
+<P> The comparison data consists of static pressures and Mach number
+distributions along the centerline of the nozzle as computed from
+one-dimensional, steady, inviscid, compressible flow theory.</P>
+
+
+<TABLE BORDER=1 CELLPADDING=7 align="center">
+
+  <CAPTION> <B> Table 2. Experimental static pressures in streamwise direction. </B> 
+  </CAPTION>
+
+  <TR> <TH scope="col"> p/p<sub>t</sub> </TH> 
+       <TH scope="col"> Static Pressure </TH> 
+       <TH scope="col"> Mach Number     </TH> </TR>
+
+  <TR> <TD scope="row"> 0.89 </TD>
+       <TD> <a href="axial.Pex.p89.gen">axial.Pex.p89.gen</a> </TD> 
+       <TD> <a href="axial.Mex.p89.gen">axial.Mex.p89.gen</a> </TD> </TR>
+
+  <TR> <TD scope="row"> 0.75 </TD>
+       <TD> <a href="axial.Pex.p75.gen">axial.Pex.p75.gen</a> </TD> 
+       <TD> <a href="axial.Mex.p75.gen">axial.Mex.p75.gen</a> </TD> </TR>
+
+  <TR> <TD scope="row"> 0.16 </TD>
+       <TD> <a href="axial.Pex.p16.gen">axial.Pex.p16.gen</a> </TD> 
+       <TD> <a href="axial.Mex.p16.gen">axial.Mex.p16.gen</a> </TD> </TR>
+
+</TABLE>
+
+
+<!---------------------------------------------------------------------->
+<H3 class="style1">Computational Studies</H3>
+
+<TABLE BORDER=1 CELLPADDING=7 align="center">
+
+  <CAPTION> <B> Table 3. Computational studies peformed for the 
+                converging-diverging verification nozzle case. </B> 
+  </CAPTION>
+
+  <TR> <TH scope="col"> Study </TH>
+       <TH scope="col"> Category </TH> 
+       <TH scope="col"> Person </TH> 
+       <TH scope="col"> Comments </TH> </TR>
+
+  <TR> <TD scope="row"> <A HREF="cdv01/cdv01.html"> Study #1</A> </TD>
+       <TD> Unit </TD> 
+       <TD> John W. Slater </TD> 
+       <TD> WIND verification. </TD> </TR>
+
+</TABLE>
+
+
+<!---------------------------------------------------------------------->
+<H3 class="style1">References</H3>
+
+<P> 1. Anderson, J.D., <I> Modern Compressible Flow </I>, McGraw Hill
+Inc., New York, 1984.</P>
+
+<P> 2. Liou, M.S., &quot;A Generalized Procedure for Constructing an
+Upwind-Based TVD Scheme.&quot;, AIAA Paper 87-0355, January, 1987. (Also
+NASA TM 88926).</P>
+
+
+<!---------------------------------------------------------------------->
+<hr>
+<span style="font-weight: bold;">Last Updated:</span> Wednesday, 10-Feb-2021 09:39:00 EST<br>
+
+
+
+
+
+<div id="footer">
+
+<!-- <img src="images/nasa_logo.gif" class="right"
+      width= "50" height="40" alt="NASA meatball" />
+-->
+
+<div>
+  <span style="font-weight: bold;">Responsible NASA Official/Curator:</span> 
+      <a href="mailto:john.w.slater@nasa.gov">John W. Slater</a>
+</div>
+
+<span><span style="font-weight: bold;">Web Policies: </span>
+      <a href="http://www.grc.nasa.gov/Doc/grcwebpolicies.html">Web Privacy Policy and Important Notices</a></span><br />
+		<span style="font-weight: bold;">Adobe Reader Download: </span>  
+        <a href="http://www.adobe.com/products/acrobat/readstep2.html" title="Go to Adobe Web Site">
+        Adobe Reader</a>
+<!-- <span class="notprinted"><span style="font-weight: bold;">Adobe Reader Download: </span>  
+        <a href="http://www.adobe.com/products/acrobat/readstep2.html" title="Go to Adobe Web Site">
+        Adobe Reader</a>
+</span> -->
+
+<!-- We participate in the US government's analytics program. See the data at analytics.usa.gov. -->
+
+<script language="javascript" id="_fed_an_ua_tag" src="https://dap.digitalgov.gov/Universal-Federated-Analytics-Min.js?agency=NASA&subagency=GRC"></script>
+
+
+</div>
+
+</BODY>
+</HTML>

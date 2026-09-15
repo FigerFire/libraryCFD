@@ -1,0 +1,180 @@
+% !TeX program = lualatex
+\documentclass[UTF8,zihao=-4,fontset=fandol]{ctexart}
+\usepackage[a4paper,top=2.1cm,bottom=2.3cm,left=2.3cm,right=2.3cm]{geometry}
+\usepackage{amsmath,amssymb,bm,booktabs,array,graphicx,caption,float,enumitem,longtable}
+\usepackage{fancyhdr,microtype,setspace,url}
+\graphicspath{{output/pdf/zhao2016_zh_figures/}{zhao2016_zh_figures/}}
+\setstretch{1.20}\setlength{\parindent}{2em}\setlength{\parskip}{0.16em}\setlength{\headheight}{14pt}
+\captionsetup{font=small,labelsep=quad}
+\pagestyle{fancy}\fancyhf{}
+\fancyhead[L]{\small 铝电解过程流动动力学数值模拟：空气-水与 CO$_2$-冰晶石比较}
+\fancyhead[R]{\small Zhao 等（2016）}\fancyfoot[C]{\thepage}
+\ctexset{section={format=\large\bfseries,name={},number=\Roman{section}.,aftername=\quad},subsection={format=\normalsize\bfseries,name={},number=\Alph{subsection}.,aftername=\quad},subsubsection={format=\normalsize\bfseries,name={},number=\arabic{subsubsection}.,aftername=\quad}}
+\title{\bfseries 铝电解过程流动动力学的数值模拟：\\空气-水体系与 CO$_2$-冰晶石体系的比较\\
+\large Numerical Modeling of Flow Dynamics in the Aluminum Smelting Process:\\Comparison Between Air-Water and CO$_2$-Cryolite Systems}
+\author{Zhibin Zhao\textsuperscript{a,b}，Yuqing Feng\textsuperscript{a,*}，M. Philip Schwarz\textsuperscript{a}，\\Peter J. Witt\textsuperscript{a}，Zhaowen Wang\textsuperscript{b}，Mark Cooksey\textsuperscript{a}\\[.5em]
+\small\textsuperscript{a}CSIRO Mineral Resources，Clayton South，Australia\\
+\small\textsuperscript{b}东北大学冶金学院，辽宁沈阳\\
+\small\textsuperscript{*}\texttt{Yuqing.Feng@csiro.au}}
+\date{\small \emph{Metallurgical and Materials Transactions B} (2016)\\
+\url{https://doi.org/10.1007/s11663-016-0872-x}}
+\begin{document}\maketitle\thispagestyle{empty}
+\begin{center}\small\itshape 中文翻译稿；章节、公式、图和表编号与原文逐一对应。\end{center}
+\begin{abstract}
+空气-水模型被广泛用于研究铝电解槽内 CO$_2$ 气泡驱动的流动，但两种体系物性存在明显差异，其相似程度仍需定量评估。本文采用三维 CFD-VOF 模型比较空气-水和 CO$_2$-冰晶石体系的单气泡及连续鼓泡动力学。单气泡模拟表明，冰晶石中的 CO$_2$ 气泡在阳极下厚度更小、展弦比更大、滑移速度更高；在侧部通道上升时，空气泡会脱离壁面，而 CO$_2$ 气泡保持附壁。无量纲分析及数值敏感性研究表明，接触角是导致差异的主导因素，运动黏度、表面张力和密度的影响很小。连续鼓泡的准稳定时间平均流型、湍动能、耗散率和气相体积分数在两体系中的分布及量级高度一致。因此，空气-水模型可作为研究铝电解气泡驱动电解质流动的近似替代体系；但由于气泡形态以及真实体系中反应成核和生长机制不同，阳极-阴极间隙内的气泡覆盖率仍可能存在差异。
+\end{abstract}
+\noindent\textbf{关键词：}铝电解；空气-水模型；CO$_2$-冰晶石；VOF；接触角；气泡驱动流
+
+\section{引言}
+Hall-H\'eroult 铝电解技术自发明以来，槽电流由约 4000 A 提高到 600000 A，电流效率由 75\% 提高到 96\%，但仍是现代工业中能耗最高的单元过程之一，生产 1 t 原铝约耗电 13000 kWh，其中约一半转化为废热。
+
+现代电解槽内，直流电由悬挂阳极进入，经熔融电解质和铝液层流向槽底阴极，再由导电棒流出。氧化铝定期加入约 1223 K 的电解质，Al 在阴极析出，氧与碳阳极反应生成 CO$_2$。CO$_2$ 气泡沿阳极底面滑动，从阳极边缘进入侧部通道并最终逸出。气泡既驱动电解质循环、影响氧化铝混合和传热，又改变槽电阻及电流分布，因此认识气泡动力学及其诱导流动对于改进槽性能至关重要。
+
+真实槽内环境具有强腐蚀性，直接实验困难。已有空气-水模型、低温电解模型、小型高温透明电解槽和 CFD 模型。空气-水模型易操作、易测量且可达到全尺寸，常用来验证 CFD。其基本依据是水与冰晶石运动黏度接近：冰晶石在 1223 K 下约为 $1.43\times10^{-6}~\mathrm{m^2/s}$，水在 298 K 下约为 $1.005\times10^{-6}~\mathrm{m^2/s}$。然而，两体系的表面张力、接触角和密度差异明显，而这些物性会强烈影响气泡形态和运动。
+
+前期二维 CFD-VOF 研究发现，两体系气泡动力学总体趋势相似，但空气泡更厚、阳极下滑移速度较低，并在侧壁上升过程中失去三相接触而离壁；CO$_2$ 气泡则始终附壁。接触角可能是主导因素，但二维模型不能反映真实三维形态，且此前只研究孤立单气泡。因此本文使用三维模型，先比较固定体积单气泡的生成、阳极下滑动和侧部通道上升，再研究连续鼓泡时的时间平均流型、湍动能、耗散率和气相体积分数。
+
+\begin{figure}[H]\centering\includegraphics[width=.68\textwidth]{fig01.png}
+\caption{典型 Hall-H\'eroult 铝电解槽示意图。}\end{figure}
+
+\section{模型描述}
+采用 ANSYS Fluent 15.0 的 VOF 方法。为突出气泡流动动力学，作如下简化：气液两相不可压缩；两相流等温；计算域内无化学反应；忽略电磁力。
+
+建立两种几何（图 2）。几何 1 是工业槽切片，厚度 100 mm，用于单气泡比较。算例 1 为 CO$_2$-冰晶石、接触角 $60^\circ$；算例 2 为空气-水、接触角 $120^\circ$；算例 3 仍为空气-水，但把接触角改为 $60^\circ$，以单独识别接触角作用。几何 2 用于连续鼓泡，省略阳极下方运动，仅模拟气泡逸出 ACD 后在侧部通道中的上升；算例 4 和 5 分别为 CO$_2$-冰晶石及空气-水。
+
+\begin{figure}[H]\centering\includegraphics[width=.96\textwidth]{fig02.png}
+\caption{计算几何：（a）单气泡模拟的几何 1；（b）连续鼓泡模拟的几何 2。}\end{figure}
+
+\begin{table}[H]\centering\caption{本文计算算例。}
+\begin{tabular}{cccc}\toprule 算例&体系&接触角&几何\\\midrule 1&CO$_2$-冰晶石&$60^\circ$&1\\2&空气-水&$120^\circ$&1\\3&空气-水&$60^\circ$&1\\4&CO$_2$-冰晶石&$60^\circ$&2\\5&空气-水&$120^\circ$&2\\\bottomrule\end{tabular}\end{table}
+
+几何 1 的 $5\times5$ mm 入口距左壁 20 mm，法向均匀速度 0.25 m/s；注气 0.12 s 形成固定体积气泡后，入口恢复为无滑移壁面。ACD 为 50 mm，初始液深 200 mm。几何 2 中假定阳极气体为纯 CO$_2$，由法拉第定律得到单位阳极面积产气率
+\begin{equation}q=\frac{iRT}{4FP}.\tag{1}\end{equation}
+若气体均匀从阳极四边逸出，则入口速度为
+\begin{equation}V=\frac{qabl}{(2a+2b)lw}=\frac{qab}{(2a+2b)w}.\tag{2}\end{equation}
+其中 $a=1300$ mm、$b=650$ mm 为阳极底面长宽，$l=100$ mm、$w=5$ mm 为入口长宽。
+
+顶面为恒定大气压出口，所有壁面对两相均为无滑移。界面表面张力采用连续表面力（CSF）模型并在壁面黏附条件中加入接触角。冰晶石在 1223 K 下的表面张力为 0.132 N/m，水在 298 K 下为 0.072 N/m。采用界面自适应网格、PISO 压力-速度耦合、PRESTO! 压力离散和 QUICK 动量离散，连续性及速度绝对收敛判据均为 $10^{-7}$。
+
+\begin{figure}[H]\centering\includegraphics[width=.72\textwidth]{fig03.png}
+\caption{单气泡上升实验与 CFD 模型验证：（a）实验；（b）CFD。}\end{figure}
+\begin{figure}[H]\centering\includegraphics[width=.68\textwidth]{fig04.png}
+\caption{不同尺寸气泡的实验与模拟终端上升速度比较。}\end{figure}
+
+\section{结果与讨论}
+\subsection{模型验证}
+采用文献中的水中气泡终端速度和形态验证模型。实验槽尺寸为 $200\times200\times1500$ mm，气体先收集于倒置杯中，旋转后释放气泡。选择直径 6、8.2 和 22.8 mm 的空气泡进行模拟。计算终端速度与实验数据吻合良好，说明 VOF 设置可靠。
+
+\subsection{单气泡模型}
+\subsubsection{无量纲分析}
+沿阳极表面运动的气泡形态与运动可表示为
+\begin{equation}
+F_{\rm bubble}=f(\rho_l,\rho_g,\Delta\rho,\mu_l,\sigma_l,d_g,v_g,g,\theta,X),\tag{3}
+\end{equation}
+其中 $X$ 包含表面非均匀性、粗糙度和阳极倾角等其他因素。Buckingham $\pi$ 定理给出
+\[
+Re=\frac{\rho_l v_gd_g}{\mu_l},\qquad
+We=\frac{\rho_l v_g^2d_g}{\sigma_l},\qquad
+Fr=\frac{\rho_l v_g^2}{\Delta\rho\,g d_g},
+\]
+因而
+\begin{equation}F_{\rm bubble}=F(Re,We,Fr,\theta,X).\tag{4}\end{equation}
+两体系的 $\mu_l/\rho_l$（控制 $Re$）和 $\sigma_l/\rho_l$（控制 $We$）数值很接近，预示运动黏度和表面张力差异对气泡行为影响不大。
+
+\begin{table}[H]\centering\caption{$Re$ 和 $We$ 的控制参数。}
+\begin{tabular}{lcc}\toprule 参数&冰晶石（1223 K）&水（298 K）\\\midrule $\mu_l/\rho_l$&$1.43\times10^{-6}$&$1.005\times10^{-6}$\\$\sigma_l/\rho_l$&$6.29\times10^{-5}$&$7.21\times10^{-5}$\\\bottomrule\end{tabular}\end{table}
+
+\subsubsection{数值分析}
+气泡在阳极下生成后被浮力压向底面并沿倾斜方向滑动。CO$_2$-冰晶石气泡比空气-水气泡更扁、更长，展弦比更大；空气-水接触角改为 $60^\circ$ 后，其形态和运动明显接近 CO$_2$-冰晶石算例，说明接触角控制壁面润湿和铺展。
+
+\begin{figure}[H]\centering\includegraphics[width=.96\textwidth]{fig05.png}
+\caption{ACD 内气泡形态随时间演化：（a）CO$_2$-冰晶石，$60^\circ$；（b）空气-水，$120^\circ$；（c）空气-水，$60^\circ$。}\end{figure}
+\begin{figure}[H]\centering\includegraphics[width=.70\textwidth]{fig06.png}
+\caption{三种算例中 ACD 内气泡展弦比随时间变化。}\end{figure}
+\begin{figure}[H]\centering\includegraphics[width=.70\textwidth]{fig07.png}
+\caption{三种算例中 ACD 内气泡宽度随时间变化。}\end{figure}
+
+气泡展弦比定义为其沿阳极方向长度 $L$ 与法向厚度 $W$ 之比：
+\begin{equation}A_r=\frac{L}{W}.\tag{5}\end{equation}
+CO$_2$ 气泡的平均厚度较小、滑移速度较高。三维结果与此前二维研究趋势一致，但三维气泡可以横向变形，厚度和形状存在定量差别，因此定量研究必须采用三维模型。
+
+\begin{figure}[H]\centering\includegraphics[width=.72\textwidth]{fig08.png}
+\caption{三种算例中 ACD 内平均气泡厚度随时间变化。}\end{figure}
+\begin{figure}[H]\centering\includegraphics[width=.72\textwidth]{fig09.png}
+\caption{三种算例中 ACD 内气泡滑移速度随时间变化。}\end{figure}
+
+气泡越过阳极边缘进入侧部通道后，两体系差异更加明显。空气泡在上升过程中从壁面脱离，丧失空气-水-阳极三相接触，随后向通道内部迁移；CO$_2$ 气泡因较小接触角保持附壁。把空气-水接触角改为 $60^\circ$ 后同样保持附壁，再次证明接触角是主导因素。
+
+\begin{figure}[H]\centering\includegraphics[width=.96\textwidth]{fig10.png}
+\caption{侧部通道中气泡上升：（a）CO$_2$-冰晶石，$60^\circ$；（b）空气-水，$120^\circ$；（c）空气-水，$60^\circ$。}\end{figure}
+
+\subsection{连续鼓泡模型}
+\subsubsection{气泡形态}
+连续鼓泡时，气体从阳极边缘转向上升后破碎为不同尺度气泡，多数初始附着于阳极侧壁。CO$_2$ 气泡保持附壁，空气泡仍会脱离，但由于连续气泡间的相互作用和液体夹带，离壁后的横向迁移弱于孤立气泡。
+\begin{figure}[H]\centering\includegraphics[width=.96\textwidth]{fig11.png}
+\caption{侧部通道连续鼓泡形态：（a）CO$_2$-冰晶石；（b）空气-水。}\end{figure}
+
+\subsubsection{准稳定状态的确定}
+在几何 2 的两个监测点记录瞬时液体速度。启动阶段速度快速变化，随后围绕稳定均值波动。选择充分发展的时间区间求时间平均量，确保平均速度、湍动能、耗散率和气相体积分数不再随平均窗口显著改变。
+\begin{figure}[H]\centering\includegraphics[width=.72\textwidth]{fig12.png}
+\caption{两个监测点的瞬时液体速度随时间变化。}\end{figure}
+
+\subsubsection{时间平均流动特性}
+两体系的时间平均流型高度相似：侧部通道形成大尺度回流，靠阳极竖壁液体向上，靠外侧壁向下。速度范围均约为 0--0.45 m/s，最大速度位于阳极竖壁附近和自由液面附近。
+\begin{figure}[H]\centering\includegraphics[width=.96\textwidth]{fig13.png}
+\caption{计算域中间平面的时间平均流型：（a）CO$_2$-冰晶石；（b）空气-水。}\end{figure}
+\begin{figure}[H]\centering\includegraphics[width=.88\textwidth]{fig14.png}
+\caption{两体系在两条测线上的时间平均速度剖面。}\end{figure}
+
+时间平均湍动能 $K$ 与气泡运动轨迹密切相关。两体系的分布形状和量级接近，$K$ 范围约为 0--0.03 m$^2$/s$^2$，与水模型测量量级一致。高值主要位于气泡羽流、阳极侧壁和自由表面破碎区域。
+\begin{figure}[H]\centering\includegraphics[width=.96\textwidth]{fig15.png}
+\caption{时间平均湍动能空间分布：（a）CO$_2$-冰晶石；（b）空气-水。}\end{figure}
+\begin{figure}[H]\centering\includegraphics[width=.88\textwidth]{fig16.png}
+\caption{两体系在两条测线上的时间平均湍动能。}\end{figure}
+
+湍流耗散率 $\varepsilon$ 的分布与 $K$ 类似，两体系均约为 0--0.014 m$^2$/s$^3$。结果可为宏观槽模型中的气泡诱导湍流源项提供依据；现有经验系数往往依赖试凑，尚缺乏适用于广泛气量的统一关联式。
+\begin{figure}[H]\centering\includegraphics[width=.96\textwidth]{fig17.png}
+\caption{时间平均湍流耗散率空间分布：（a）CO$_2$-冰晶石；（b）空气-水。}\end{figure}
+\begin{figure}[H]\centering\includegraphics[width=.72\textwidth,height=.62\textheight,keepaspectratio]{fig18.png}
+\caption{两体系在测线上的时间平均湍流耗散率。}\end{figure}
+
+侧部通道时间平均气相体积分数也呈相似趋势，气泡羽流向自由表面逐渐展宽。靠近槽底时，CO$_2$ 体积分数由壁面向外单调下降，而空气体积分数先升后降，反映 CO$_2$ 气泡附壁、空气泡离壁。靠近自由表面时，两者均随羽流位置先增加后减小。该分布可用于校正全槽尺度模型中的气泡诱导湍流扩散力。
+\begin{figure}[H]\centering\includegraphics[width=.72\textwidth,height=.62\textheight,keepaspectratio]{fig19.png}
+\caption{计算域中间平面的时间平均气相体积分数。}\end{figure}
+\begin{figure}[H]\centering\includegraphics[width=.72\textwidth,height=.62\textheight,keepaspectratio]{fig20.png}
+\caption{两体系在不同高度测线上的时间平均气相体积分数。}\end{figure}
+
+\section{结论}
+单气泡模型的主要结论为：
+\begin{enumerate}[label=\arabic*.]
+\item 冰晶石中的 CO$_2$ 气泡在阳极下厚度更小、展弦比更大、滑移速度更高。
+\item 空气泡在侧部通道上升时脱离壁面，而 CO$_2$ 气泡保持附壁。
+\item 接触角是造成上述差异的主导因素；运动黏度、表面张力和密度差异影响很小。
+\item 二维和三维模型得到的体系差异趋势相同，但三维模型预测的气泡形状和厚度存在额外差异，定量研究需要三维计算。
+\end{enumerate}
+连续鼓泡模型的主要结论为：
+\begin{enumerate}[label=\arabic*.]
+\item 两体系均形成多尺度气泡，多数气泡最初附着于阳极侧壁；空气泡随后脱壁，但横向迁移弱于孤立气泡。
+\item 两体系时间平均流型相似，均形成靠阳极上升、靠槽壁下降的回流，速度范围均为 0--0.45 m/s。
+\item $K$ 和 $\varepsilon$ 与气泡轨迹密切相关，两体系的分布和量级均相近，分别约为 0--0.03 m$^2$/s$^2$ 和 0--0.014 m$^2$/s$^3$。
+\item 侧部通道时间平均气相体积分数趋势相近，羽流均向自由表面展宽。
+\end{enumerate}
+总体而言，空气-水体系可作为研究铝电解气泡驱动电解质流动的良好替代模型；但由于气泡形态不同，且真实槽内存在反应成核和生长，ACD 内阳极气泡覆盖率仍可能不同。
+
+\section*{致谢}
+作者感谢 CSIRO Mineral Resources 和中国国家自然科学基金（项目号 551529401）的资助。Zhibin Zhao 感谢国家留学基金管理委员会提供访问博士生奖学金。
+
+\section*{符号说明}
+\begin{longtable}{p{.16\textwidth}p{.74\textwidth}}
+$i$&阳极电流密度，A/cm$^2$\\$T$&绝对温度，K\\$P$&压力，Pa\\$q$&单位阳极底面积产气率，m$^3$/(m$^2$ s)\\
+$a,b$&阳极底面长度、宽度\\$l,w$&入口边界长度、宽度\\$V$&气体入口速度，m/s\\
+$\rho_l,\rho_g,\Delta\rho$&液体密度、气体密度及密度差\\$\mu_l$&液体动力黏度\\$\sigma_l$&液体表面张力\\
+$d_g,v_g$&气泡当量直径及速度\\$L,W$&滑动气泡长度及厚度\\$K$&湍动能，m$^2$/s$^2$\\
+$\theta$&接触角\\$\varepsilon$&湍流耗散率，m$^2$/s$^3$\\$\nu$&运动黏度，m$^2$/s\\
+\end{longtable}
+
+\section*{参考文献}
+\small 原文共列出 75 篇参考文献，涵盖 Hall-H\'eroult 电解、水模型、透明电解槽、VOF、接触角、气泡诱导湍流以及多尺度模拟等研究。正文引文序号与英文原文保持一致；完整书目信息见原文参考文献表。
+
+\vfill\begin{center}\footnotesize 翻译依据：Zhao et al., \emph{Metallurgical and Materials Transactions B} (2016), DOI: 10.1007/s11663-016-0872-x。\end{center}
+\end{document}

@@ -1,0 +1,1624 @@
+\documentclass[12pt,a4paper,openany,fontset=none]{ctexbook}
+\usepackage[margin=2.45cm,headheight=15pt]{geometry}
+\usepackage{amsmath,amssymb,mathtools,bm,booktabs,longtable,array,graphicx,adjustbox}
+\usepackage{enumitem,caption,fancyhdr,microtype,hyperref,xurl}
+\setmainfont{Times New Roman}
+\setsansfont{Arial}
+\setmonofont{Menlo}
+\setCJKmainfont{Songti SC}
+\setCJKsansfont{Heiti SC}
+\setCJKmonofont{PingFang SC}
+\geometry{heightrounded}
+\setlength{\parindent}{2em}
+\setlength{\parskip}{0.48em}
+\linespread{1.28}
+\setlength{\emergencystretch}{3em}
+\setlist{itemsep=.32em,topsep=.45em}
+\captionsetup{font=small,labelfont=bf,labelsep=quad,skip=7pt}
+\ctexset{
+  chapter={format=\centering\bfseries\Huge,name={第,章},number=\chinese{chapter},beforeskip=1.5cm,afterskip=1.2cm},
+  section={format=\bfseries\Large},
+  subsection={format=\bfseries\large}
+}
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[LE,RO]{\small\thepage}
+\fancyhead[LO]{\small\nouppercase{\leftmark}}
+\fancyhead[RE]{\small\nouppercase{\leftmark}}
+\renewcommand{\headrulewidth}{0.4pt}
+\hypersetup{unicode=true,colorlinks=true,linkcolor=black,urlcolor=blue,pdfauthor={Parviz Moin; W. H. Ronald Chan},pdftitle={湍流基础（中文译本）}}
+\newcommand{\Rey}{\mathrm{Re}}
+\newcommand{\Pran}{\mathrm{Pr}}
+\newcommand{\St}{\mathrm{St}}
+\newcommand{\Nu}{\mathrm{Nu}}
+\newcommand{\dd}{\,\mathrm d}
+\newcommand{\avg}[1]{\left\langle #1\right\rangle}
+\newcommand{\sourcecrop}[6]{%
+  \begin{figure}[htbp]\centering
+  \includegraphics[page=#1,viewport={#2bp #3bp #4bp #5bp},clip,width=.94\textwidth,height=#6\textheight,keepaspectratio]{\detokenize{Fundamentals of Turbulent Flows (Parviz Moin, W. H. Ronald Chan) (z-library.sk, 1lib.sk, z-lib.sk).pdf}}%
+  \end{figure}}
+\newcommand{\sourcefigure}[7]{%
+  \begin{figure}[htbp]\centering
+  \includegraphics[page=#1,viewport={#2bp #3bp #4bp #5bp},clip,width=.94\textwidth,height=#6\textheight,keepaspectratio]{\detokenize{Fundamentals of Turbulent Flows (Parviz Moin, W. H. Ronald Chan) (z-library.sk, 1lib.sk, z-lib.sk).pdf}}%
+  \caption{#7}\end{figure}}
+\newenvironment{keypoint}{\begin{quote}\small\noindent\textbf{要点}\quad}{\end{quote}}
+
+\title{湍流基础}
+\author{Parviz Moin \quad W. H. Ronald Chan\\[.7em]\large 中文译本}
+\date{原著 2025 年出版}
+
+\begin{document}
+\frontmatter
+\maketitle
+\chapter*{译本说明}
+\markboth{译本说明}{译本说明}
+本译本按中文研究生教材的阅读习惯重新排版，不与原书页码机械对齐。术语以流体力学、湍流理论与计算流体力学中的通行译法为准；首次出现的重要缩写保留英文，例如直接数值模拟（DNS）、大涡模拟（LES）和雷诺平均 Navier--Stokes 方程（RANS）。短式和中等长度推导均重写为 LaTeX；实验照片、流场云图和谱图只截取图形本体，中文题注另行排版。
+
+\tableofcontents
+
+\chapter*{常用符号与中文释义}
+\addcontentsline{toc}{chapter}{常用符号与中文释义}
+\markboth{常用符号与中文释义}{常用符号与中文释义}
+\begin{longtable}{>{\centering\arraybackslash}p{.22\textwidth}p{.68\textwidth}}
+\toprule 符号 & 中文释义\\ \midrule
+$u_i,\,U_i$ & 瞬时速度分量；平均速度分量\\
+$u_i'$ & 速度脉动分量，满足 $u_i=U_i+u_i'$\\
+$p,\,P,\,p'$ & 瞬时压力、平均压力和压力脉动\\
+$\rho,\nu,\mu$ & 密度、运动黏度和动力黏度，$\mu=\rho\nu$\\
+$k=\avg{u_i'u_i'}/2$ & 单位质量湍动能\\
+$\varepsilon=2\nu\avg{s'_{ij}s'_{ij}}$ & 湍动能耗散率\\
+$R_{ij}=\avg{u_i'u_j'}$ & 雷诺应力张量（按速度平方量纲书写）\\
+$\omega_i=\epsilon_{ijk}\partial u_k/\partial x_j$ & 涡量矢量\\
+$E(\kappa)$ & 三维能谱；$\kappa$ 为波数模\\
+$L,\lambda,\eta$ & 积分尺度、Taylor 微尺度和 Kolmogorov 长度尺度\\
+$u_\tau=\sqrt{\tau_w/\rho}$ & 摩擦速度\\
+$y^+=yu_\tau/\nu$ & 黏性单位表示的壁面距离\\
+$\Rey,\Pran,\Nu,\St$ & Reynolds 数、Prandtl 数、Nusselt 数和 Stanton 数\\
+\bottomrule
+\end{longtable}
+
+\chapter*{前言}
+\addcontentsline{toc}{chapter}{前言}
+\markboth{前言}{前言}
+湍流是流体力学中一个独立而重要的分支。一个多世纪以来，物理学家、工程师和数学家持续投入大量精力研究它。湍流在自然界与工程系统中无处不在，因此具有巨大的实际意义。近几十年，大规模数值模拟使人们能够细致考察广泛的湍流，并积累了可用于提炼物理认识的海量数据。光学诊断技术虽有长足进展，但实验测量通常仍受空间或时间分辨率限制。Stanford 大学湍流研究中心长期致力于典型湍流的高保真模拟，这促使作者在经典理论的基础上，以数值数据库为核心重新组织一部现代教材。
+
+全书同时采用经典和现代实验、数值数据说明湍流的物理与统计性质，并介绍流场数据处理的基本工具。配套练习使用真实典型流数据库，使读者不仅理解公式，还能建立可复现的分析能力。最后两章集中讨论湍流预测中的建模和数值方法。
+
+本书源于 Stanford 研究生湍流课程讲义。读者应具备本科流体力学和工程数学基础，熟悉微积分、常微分与偏微分方程、线性代数以及基本概率统计。全书按一学期课程设计：第 1--7 章讲授湍流物理，第 8--9 章分别介绍建模和高保真模拟数值问题。习题分为概念判断、解析推导和基于数据的计算练习。作者特别感谢 Stanford、NASA Ames 与湍流研究中心数代学者对本课程和数据库的建设。
+
+\mainmatter
+\chapter{湍流概述}
+
+湍流广泛存在于热带气旋、云层、海浪、河流、大气边界层以及汽车、船舶、飞机、燃气轮机和化工设备中。它并不只是“无规则的流动”，而是一种具有宽广时空尺度、强非线性相互作用和显著输运增强的流动状态。工程师关心湍流，因为它控制阻力、升力、混合、传热、燃烧、噪声和污染物扩散；科学家关心湍流，因为其中存在从大尺度有序运动到小尺度耗散结构的持续能量传递。
+
+\sourcefigure{16}{88}{275}{454}{660}{0.55}{自然与工程中的湍流实例：火积云、船舶尾迹、机翼尾流、破碎波自由表面、飞机涡结构以及发动机温度场。不同流动的几何尺度相差巨大，却都呈现宽尺度、非定常结构。}
+
+以大型油轮边界层为例。若船长 $L=300\,\mathrm m$、航速 $U=10\,\mathrm{m\,s^{-1}}$、海水运动黏度约为 $10^{-6}\,\mathrm{m^2\,s^{-1}}$，则
+\begin{equation}
+  \Rey_L=\frac{UL}{\nu}\approx 3\times10^9,
+\end{equation}
+远高于保持层流所需的范围。湍流边界层带来的摩擦阻力可占推进功率的重要部分，因此即使阻力只降低几个百分点，也具有可观的能源意义。
+
+\section{湍流的物理性质}
+
+\subsection*{非定常、三维与旋转性}
+
+湍流速度场在时间和空间中持续脉动。即便平均流近似二维，瞬时湍流通常仍为三维，并具有非零涡量。将速度写成平均量与脉动量之和，
+\begin{equation}
+  u_i(\bm x,t)=U_i(\bm x)+u_i'(\bm x,t),\qquad \avg{u_i'}=0,
+\end{equation}
+是后续统计描述的基础。平均量并不表示流体真正以平滑方式运动，而是大量瞬时实现的统计代表。
+
+Leonardo da Vinci 的水流素描已经显示出大旋涡中嵌套小旋涡的景象。现代实验和 DNS 进一步表明，湍流结构并非单一尺度：大尺度通常受几何和边界条件支配，小尺度则更接近普适状态。尺度嵌套是湍流能量级联图景的直观来源。
+
+\sourcefigure{20}{110}{475}{454}{646}{0.32}{平板湍流边界层的瞬时速度剖面与流动可视化。瞬时剖面围绕平滑均值显著波动；示踪线仍显示具有持续性的流向结构。}
+
+\subsection*{表观随机性与确定性方程}
+
+Navier--Stokes 方程是确定性的，但高 Reynolds 数流动对初始和边界扰动极其敏感。有限精度测量无法完整给出所有自由度，导致长期预测呈现随机性。因此湍流分析采用统计量，例如均值、方差、相关函数和概率密度，而不是试图逐点长期预测瞬时场。这种统计处理不是放弃动力学，而是针对高维混沌系统选择合适的可预测量。
+
+\subsection*{增强扩散与耗散}
+
+湍流脉动把质量、动量和热量快速输送到远大于分子自由程的距离。文献常称之为“湍流扩散”，但它与由分子随机运动造成的黏性或热扩散不同。湍流输运由跨越宽广尺度的旋涡运动完成，并具有方向性、非局部性和明显的流动依赖。
+
+湍流也具有耗散性。平均流或大尺度运动的动能通过非线性作用转移到更小尺度，最终在黏性占优势的尺度上转化为内能。单位质量瞬时黏性耗散可写成
+\begin{equation}
+  \varepsilon=2\nu\avg{s'_{ij}s'_{ij}},\qquad
+  s'_{ij}=\frac12\left(\frac{\partial u_i'}{\partial x_j}+\frac{\partial u_j'}{\partial x_i}\right).
+\end{equation}
+只要外界持续供给能量，统计稳定的湍流就能在输入与耗散之间建立动态平衡。
+
+\subsection*{宽广尺度与高计算代价}
+
+尺度范围随 Reynolds 数迅速增大。若外尺度为 $L$，耗散尺度为 $\eta$，Kolmogorov 理论给出
+\begin{equation}
+  \frac{L}{\eta}\sim \Rey_L^{3/4}.
+\end{equation}
+三维 DNS 所需网格点数因而大致按 $\Rey_L^{9/4}$ 增长，时间步数也随最小时间尺度增加。这解释了为什么高 Reynolds 数工程流动至今仍主要依赖 RANS 或 LES，而不是直接解析全部尺度。
+
+\sourcefigure{23}{88}{482}{454}{660}{0.33}{不同 Reynolds 数 Rayleigh--B\'enard 湍流的横截面温度场。大尺度组织相似，但较高 Reynolds 数流动包含更细密的小尺度温度结构。}
+
+\begin{keypoint}
+湍流的四个核心特征是：强非定常三维运动、统计随机性、显著增强的输运，以及从大尺度到小尺度的能量传递与黏性耗散。
+\end{keypoint}
+
+\section{增强扩散对尺度与结构的影响}
+
+\subsection{混合与传热增强}
+
+湍流会加快动量亏损向外扩散，因此在相同外流速度和流体性质下，湍流边界层通常比层流边界层厚。自由剪切流也类似：湍流射流比层流射流更快卷吸周围流体，横向宽度增长更快。
+
+考虑不可压缩平面射流，其平均流向速度为 $U_1(y)$。单位展向长度的动量通量守恒意味着
+\begin{equation}
+  \int_{-\infty}^{\infty}U_1^2\dd y=C_m,
+\end{equation}
+因而特征速度满足 $U\sim(C_m/\delta)^{1/2}$。层流射流中，对流时间与黏性扩散时间分别为
+\begin{equation}
+  T_c\sim\frac{x}{U},\qquad T_{d,\mathrm{lam}}\sim\frac{\delta_{\mathrm{lam}}^2}{\nu}.
+\end{equation}
+令二者同阶并代入 $U\sim\delta^{-1/2}$，得到
+\begin{equation}
+  \delta_{\mathrm{lam}}\sim x^{2/3}.
+\end{equation}
+湍流射流的横向输运由旋涡速度尺度 $u'$ 控制，$T_{d,\mathrm{turb}}\sim\delta/u'$。远场中 $u'/U$ 变化缓慢，于是
+\begin{equation}
+  \delta_{\mathrm{turb}}\sim x,
+\end{equation}
+其展宽显著快于层流射流。
+
+湍流同样增强壁面传热。等温平板的局部 Nusselt 数常用相关式为
+\begin{align}
+ \Nu_x^{\mathrm{lam}}&=0.332\Rey_x^{1/2}\Pran^{1/3},\\
+ \Nu_x^{\mathrm{turb}}&=0.0296\Rey_x^{4/5}\Pran^{1/3}.
+\end{align}
+除入口附近外，湍流相关式给出的换热强度远高于层流值。这里 $\Pran=\nu/\alpha$ 比较动量扩散率与热扩散率。
+
+\sourcefigure{24}{214}{548}{454}{662}{0.23}{超声速燃烧中的瞬时 OH 质量分数。火焰面的大尺度起伏上叠加了细小褶皱，增大反应界面面积并促进混合。}
+
+\subsection{延迟分离与减阻}
+
+逆压梯度使外流减速，并可能使近壁流体动量不足而发生分离。湍流边界层通过强横向动量交换，把外层高动量流体输送到近壁区，因此平均速度剖面更“饱满”，通常比层流边界层更能抵抗分离。
+
+物体总阻力由摩擦阻力与压差阻力组成。湍流会增加壁面摩擦，却可能因推迟分离而显著减小压差阻力。钝体的压差阻力占主导时，主动促使边界层提前转捩反而能降低总阻力。高尔夫球凹坑正是这一原理：凹坑触发湍流，分离点后移，尾迹变窄，总阻力下降。
+
+\section{从层流向湍流的转捩}
+
+设层流基态为 $\bm U(\bm x)$，叠加扰动 $\bm u'(\bm x,t)$。在足够高的 Reynolds 数下，扰动可能增长、发生非线性相互作用并最终形成湍流。临界 Reynolds 数和转捩路径取决于流动类型、扰动幅值、表面粗糙度、自由来流湍流度与压力梯度。
+
+\begin{itemize}
+  \item \textbf{管流：}以管径为尺度时，$\Rey_D\gtrsim2000$ 可观察到转捩，但通常需要有限幅值扰动。层流管流对无穷小扰动在线性意义下稳定，因此属于典型的旁路或亚临界转捩。
+  \item \textbf{平面通道流：}超过线性临界值后，无穷小 Tollmien--Schlichting 型扰动也可能增长；实际转捩常在更低 Reynolds 数下由有限幅值扰动触发。
+  \item \textbf{自由剪切流：}射流、尾迹和混合层缺少固壁约束，剪切层不稳定性会快速放大，转捩对 Reynolds 数的敏感程度通常小于壁面流。
+  \item \textbf{边界层：}转捩可从基于位移厚度的 $\Rey_{\delta^*}\sim600$ 左右开始，但具体位置强烈依赖来流扰动经感受性机制进入边界层的方式。
+\end{itemize}
+
+转捩不是单一事件，而是从扰动感受、线性或非模态增长、二次不稳定到小尺度崩解的一系列过程。对工程预测而言，转捩位置决定摩擦阻力、分离、换热和噪声，必须与完全湍流模型区别处理。
+
+\sourcefigure{35}{122}{505}{420}{650}{0.32}{甲烷射流扩散火焰随 Reynolds 数增大而转捩。由左至右，剪切层不稳定波逐渐增长，核心相干结构破碎并出现更丰富的小尺度。}
+
+\sourcefigure{36}{115}{435}{430}{565}{0.30}{高超声速边界层受斜激波撞击后的转捩结构：上图为侧视场，下图为壁面换热分布。激波作用触发条带与湍斑并显著提高局部热流。}
+
+\section{湍流增强扩散的两个估算例}
+
+\subsection*{飞机尾迹与凝结尾}
+
+若流动保持湍流，尾迹宽度可按大尺度速度脉动引起的卷吸近似线性增长；一旦湍流衰减，剩余水汽或温度异常只能依靠分子扩散缓慢展宽。因此远离飞机后凝结尾直径几乎不变，并不意味着黏性很强，反而说明产生快速卷吸的湍流已显著减弱。
+
+可用有效扩散率比较两种过程。分子扩散率为 $D$，而湍流有效扩散率量级为
+\begin{equation}
+  D_t\sim u'\ell,
+\end{equation}
+其中 $u'$ 和 $\ell$ 分别代表输运旋涡的速度与长度尺度。在大气和工程流动中，$D_t/D$ 常可达到许多数量级。
+
+\subsection*{烟羽与污染物扩散}
+
+点源排放在平均风速 $U$ 中向下游输送。若横向脉动速度为 $v'$，相关时间为 $T_L$，长时间极限下横向均方位移近似满足
+\begin{equation}
+  \avg{y^2}\simeq 2K_y t,\qquad K_y\sim \avg{v'^2}T_L,
+\end{equation}
+并由 $x\simeq Ut$ 转换为下游展宽规律。这个关系说明，污染羽流宽度不仅由脉动强度决定，还取决于速度保持相关的时间。
+
+\section*{概念检查与练习提示}
+
+\begin{enumerate}
+  \item 湍流是否等同于完全随机运动？说明确定性方程、敏感依赖和统计描述之间的关系。
+  \item 用量纲分析重新推导平面层流射流的 $\delta\sim x^{2/3}$，并解释湍流射流为何近似线性展宽。
+  \item 对空气中等温平板，取 $\Pran=0.7$，比较 $\Rey_x=10^5$ 与 $10^6$ 时层流、湍流 Nusselt 数。
+  \item 解释为什么粗糙度既可能增大摩擦阻力，也可能降低钝体总阻力。
+  \item 从 $D_t\sim u'\ell$ 出发，为大气烟羽估算湍流扩散率并与分子扩散率比较。
+\end{enumerate}
+
+\subsection*{判断题}
+判断并说明理由：（1）相同 $\Rey_x$ 下，平板湍流边界层的壁面热流高于层流边界层；（2）湍流的随机性源于分子的随机热运动；（3）混沌性会阻止大尺度相干结构存在。第一项通常正确，后两项错误：宏观湍流随机性来自非线性高维系统对扰动的敏感性，而混沌背景中仍能出现统计寿命较长的相干运动。
+
+\subsection*{原书综合练习译文}
+\begin{enumerate}[label=\arabic*.,start=1]
+ \item 观看 Mount St. Helens 火山喷发资料，画出喷口、浮力烟羽、卷吸边界和主要涡结构。估计喷口处 Reynolds 数，并用 $L/\eta\sim\Rey^{3/4}$ 估算尺度比和三维 DNS 网格量。讨论若不存在湍流，烟羽横向扩张、周围空气卷吸和颗粒悬浮会如何改变。
+
+ \item Boeing 787 机翼上表面安装了小型翼形涡流发生器。说明其高度与局部边界层厚度的相对关系，以及它如何产生流向涡、把外层高动量流体输送到近壁区、延迟逆压梯度分离。结合摩擦阻力增加与压差阻力减小，判断对机翼升阻性能的净影响。
+
+ \item 估算雪茄烟雾充满教室的时间，并明确房间尺寸、温度、烟粒半径和通风条件。若把烟粒分子扩散率写成 Stokes--Einstein 关系
+ \begin{equation}
+  D=\frac{k_BT}{6\pi\mu r},
+ \end{equation}
+ 扩散时间为 $T_D\sim L^2/D$，所得时间通常远超实际观察。再把烟粒视为被动示踪物，取热羽流的 $D_t\sim u'\ell$，比较新的混合时间。说明教室中人体热羽流和微弱空气运动为何进一步缩短混合时间。
+
+ \item 粒子图像测速（PIV）用有限质量粒子追踪气流。忽略粒子相互作用时，粒子运动方程为
+ \begin{equation}
+  \rho_p\frac{\pi d_p^3}{6}\frac{\dd\bm v}{\dd t}
+  =-C_D\rho_f\frac{\pi d_p^2}{4}|\bm v-\bm u|(\bm v-\bm u).
+ \end{equation}
+ 在小粒子 Reynolds 数极限代入 Stokes 阻力，推导响应时间
+ \begin{equation}
+  \tau_p=\frac{\rho_pd_p^2}{18\mu}.
+ \end{equation}
+ 对直径 $1\,\mu\mathrm m$ 的聚苯乙烯粒子，估算大气条件下 $\tau_p$。以边界层大涡时间 $T_L\sim\delta/U_\infty$ 定义 $\mathrm{Stk}=\tau_p/T_L$，判断速度追踪误差何时超过 $2\%$。讨论重力沉降、有限 Reynolds 数阻力修正和大 Stokes 数弹道轨迹。
+
+ \item 以 Deepwater Horizon 井喷为背景，把油滴、天然气泡与夹带海水组成的羽流近似为从直径 $19.5$ 英寸管口喷出的浮力射流。根据约 $5000$ 英尺水深、流量与混合物物性估算 $\Rey$、$L/\eta$ 及从井口到海面的 DNS 网格量，并考虑轴对称射流直径随高度线性增长。随后用 $\mathrm{Stk}$ 讨论 PIV 示踪粒子的合适密度与尺寸，并列出气泡遮挡、非均匀照明、三相折射和视窗有限等测量困难。
+
+ \item 仿照平面射流标度，推导平板层流与湍流边界层厚度。层流由 $x/U\sim\delta^2/\nu$ 得 $\delta/x\sim\Rey_x^{-1/2}$。若湍流横向输运时间为 $\delta/u'$，先得到 $\delta/x\sim u'/U$；再要求经验标度 $\delta\sim x^{4/5}$，求 $u'/U$ 对 $x$ 的弱幂律依赖。
+
+ \item 人大声说话时会喷出宽粒径分布的液滴。画出大滴重力沉降、小滴随湍流呼气射流输运的轨迹。以口部尺度 $a$ 和出口速度 $v_0$ 计算雾化可视化所用 $1\,\mu\mathrm m$ 液滴的 Stokes 数，并求 $\mathrm{Stk}\sim1$ 的临界直径。若呼气近似稳态圆射流，动量守恒给出
+ \begin{equation}
+  v(x)=\frac{v_0a}{\alpha x},qquad
+  t(L)=\int_0^L\frac{\dd x}{v(x)}=\frac{\alpha L^2}{2v_0a}.
+ \end{equation}
+ 取半锥角 $10^\circ$，估算液滴到达 $L=2\,\mathrm m$ 所需时间，并讨论稳态假设、浮力和环境通风造成的偏差。
+
+ \item Townsend 附着涡假设认为主要涡尺度和涡心离壁距离均为 $y$，速度尺度为 $u_\tau$。写出局部涡 Reynolds 数 $\Rey_y=u_\tau y/\nu=y^+$。由 $\varepsilon\sim u_\tau^3/y$ 推导局部 Kolmogorov 尺度
+ \begin{equation}
+  \eta(y)\sim\left(\frac{\nu^3y}{u_\tau^3}\right)^{1/4},
+ \end{equation}
+ 并据此画出通道 DNS 合理网格尺寸随壁距的变化。说明黏性底层和外层为何偏离该标度。
+
+ \item 平面尾迹中若大涡速度 $u_L\sim x^{-1/2}$、宽度 $L\sim x^{1/2}$，由 $\varepsilon\sim u_L^3/L$ 求 $\eta(x)$。再对自推进轴对称物体尾迹的 $u_L\sim x^{-4/5}$、$L\sim x^{1/5}$ 重复推导，比较小尺度随下游距离增长的快慢。
+
+ \item 在长 $L=5\,\mathrm m$ 的一维封闭水管中求解染料扩散方程，端点取零通量，初始浓度为零，在 $0.18L<x<0.22L$ 区间以 $1\,\mathrm{M\,s^{-1}}$ 注入。分别采用分子扩散率与合理湍流有效扩散率，计算 $x=0.9L$ 处浓度首次超过 $1\,\mathrm M$ 的时间，并做网格、时间步收敛检查。
+\end{enumerate}
+
+\section*{本章参考文献说明}
+本章引用的经典资料涉及 da Vinci 的涡旋观察、Prandtl 边界层理论、层流与湍流换热相关式、自由剪切流相似理论，以及现代 DNS 对转捩、机翼流动和高超声速激波/边界层相互作用的研究。完整书目信息见原书第 36--38 页；译本末尾保留全书核心参考文献。
+\chapter{控制方程、湍流的统计描述与封闭问题}
+
+\section{运动方程}
+
+对密度恒定、物性不变的不可压缩 Newton 流体，连续方程和动量方程为
+\begin{align}
+ \frac{\partial u_i}{\partial x_i}&=0,\\
+ \frac{\partial u_i}{\partial t}+u_j\frac{\partial u_i}{\partial x_j}
+ &=-\frac{1}{\rho}\frac{\partial p}{\partial x_i}
+   +\nu\frac{\partial^2u_i}{\partial x_j\partial x_j}+f_i.
+\end{align}
+这里采用 Einstein 求和约定，重复下标表示对三个坐标方向求和。压力在不可压缩流中不是独立的热力学变量，而是保证速度场无散的约束变量。对被动标量 $\theta$，
+\begin{equation}
+ \frac{\partial\theta}{\partial t}+u_j\frac{\partial\theta}{\partial x_j}
+ =\alpha\nabla^2\theta+q_\theta.
+\end{equation}
+速度非线性对流项使不同尺度相互耦合，是湍流动力学的根源；黏性项则在小尺度消耗动能。
+
+\section{单点单时刻统计量}
+
+\subsection{平均、统计定常性与均匀性}
+
+随机变量 $X$ 的总体平均为
+\begin{equation}
+ \avg{X}=\int_{-\infty}^{\infty}x\,p_X(x)\dd x,
+\end{equation}
+其中 $p_X$ 为概率密度函数。湍流实验与模拟通常只有有限样本，因此用集合平均、时间平均或空间平均估计总体平均。若过程统计定常，则统计量不随时间原点改变；若在某一方向均匀，则统计量不随该方向的位置改变。遍历性假设允许在足够长记录或足够大均匀区域上用单一实现替代集合平均。
+
+Reynolds 分解写作
+\begin{equation}
+ u_i=U_i+u_i',\qquad U_i=\avg{u_i},\qquad \avg{u_i'}=0.
+\end{equation}
+平均算子满足线性、常数保持以及在适当光滑和统计条件下与微分交换等 Reynolds 规则。有限样本会使脉动均值不严格为零，实际分析应同时报告采样长度和统计不确定度。
+
+\subsection{方差与湍流强度}
+
+方差衡量变量围绕均值的离散程度：
+\begin{equation}
+ \sigma_X^2=\avg{(X-\avg X)^2}.
+\end{equation}
+速度分量的均方根脉动为 $u_{i,\mathrm{rms}}=\sqrt{\avg{u_i'^2}}$。常用湍流强度是它与某个代表速度的比值。各向同性湍流中三个分量方差相等；剪切流中它们通常不同，因此仅给出单一“湍流度”可能掩盖显著各向异性。
+
+\subsection{典型流动}
+
+典型湍流是几何和统计性质足够简单、但仍保留关键物理机制的流动，包括周期盒中的均匀各向同性湍流、均匀剪切湍流、平面通道、零压梯度边界层、平面射流、尾迹和混合层。它们为理论、实验、DNS 数据库和模型检验提供共同基准。
+
+\sourcefigure{64}{145}{582}{395}{655}{0.20}{风洞收缩段与扩张段所产生湍流的几何示意。箭头表示平均来流方向，阴影表示瞬时湍动区域。}
+\sourcefigure{64}{232}{415}{420}{510}{0.19}{平板湍流边界层示意。边界层沿流向增厚，外缘为随时间起伏的湍流—非湍流界面。}
+\sourcefigure{64}{232}{340}{420}{403}{0.15}{充分发展平行平板通道流示意。统计量在流向与展向均匀，仅随壁法向坐标变化。}
+\sourcefigure{64}{265}{268}{455}{337}{0.16}{充分发展圆管流示意。平均速度仅随径向坐标变化，轴向与周向统计均匀。}
+
+以充分发展平面通道流为例，流向和展向统计均匀，平均速度只有流向分量 $U(y)$；但瞬时场仍是三维非定常的。通道半高 $h$、体平均速度 $U_b$ 和摩擦速度 $u_\tau$ 分别形成不同 Reynolds 数：
+\begin{equation}
+ \Rey_b=\frac{2hU_b}{\nu},\qquad \Rey_\tau=\frac{hu_\tau}{\nu}.
+\end{equation}
+
+\subsection{高阶统计量}
+
+偏度和峰度分别为
+\begin{equation}
+ S_X=\frac{\avg{X'^3}}{\sigma_X^3},\qquad
+ F_X=\frac{\avg{X'^4}}{\sigma_X^4}.
+\end{equation}
+$S_X$ 描述分布的不对称性，$F_X$ 衡量尾部相对 Gaussian 分布的厚度。间歇性小尺度事件常导致速度梯度、耗散率或标量梯度具有很大的峰度。高阶矩对罕见事件敏感，收敛所需样本数远多于均值和方差。
+
+\section{两点及时空统计}
+
+两点相关张量定义为
+\begin{equation}
+ R_{ij}(\bm x,\bm r,\tau)=
+ \avg{u_i'(\bm x,t)u_j'(\bm x+\bm r,t+\tau)}.
+\end{equation}
+在均匀、定常条件下，它只依赖分离向量 $\bm r$ 和时间延迟 $\tau$。归一化自相关在零分离处等于 1，并随分离增加而衰减；负相关意味着两处脉动倾向于反向变化。
+
+积分长度和时间尺度可由相关函数面积定义：
+\begin{equation}
+ L_{ii}=\int_0^\infty \frac{R_{ii}(r,0)}{R_{ii}(0,0)}\dd r,
+ \qquad
+ T_{ii}=\int_0^\infty \frac{R_{ii}(0,\tau)}{R_{ii}(0,0)}\dd\tau.
+\end{equation}
+实际有限记录中的相关函数会在大延迟处受噪声支配，积分上限通常取首次过零点或采用拟合外推。Taylor 冻结湍流假设以 $r_1\simeq-U_c\tau$ 把时间延迟换成流向距离，仅当平均对流速度远大于结构演化速度时可靠。
+
+除普通平均外，还可采用相位平均、条件平均和 Favre 平均。相位平均适合周期受迫流；条件平均用于识别特定事件附近的典型结构；可压缩流常用密度加权平均
+\begin{equation}
+ \widetilde{\phi}=\frac{\avg{\rho\phi}}{\avg\rho},\qquad \phi=\widetilde\phi+\phi''.
+\end{equation}
+
+\section{RANS 方程与 Reynolds 应力}
+
+将 Reynolds 分解代入运动方程并平均，得到
+\begin{align}
+ \frac{\partial U_i}{\partial x_i}&=0,\\
+ \frac{\partial U_i}{\partial t}+U_j\frac{\partial U_i}{\partial x_j}
+ &=-\frac{1}{\rho}\frac{\partial P}{\partial x_i}
+ +\nu\nabla^2U_i-\frac{\partial\avg{u_i'u_j'}}{\partial x_j}+f_i.
+\end{align}
+新增项 $-\avg{u_i'u_j'}$ 具有应力形式，称为 Reynolds 应力。它代表脉动引起的平均动量通量，而非分子接触力。张量 $R_{ij}=\avg{u_i'u_j'}$ 对称，具有六个独立分量；其迹满足 $R_{ii}=2k$。
+
+RANS 方程的未知量多于独立方程，这就是封闭问题。若继续推导 $R_{ij}$ 的输运方程，会出现压力-应变相关和三阶矩；为三阶矩推导方程又产生更高阶统计量，形成无穷层级。湍流模型必须用较低阶已知量近似这些未封闭项，并满足对称性、可实现性、近壁极限和能量约束。
+
+标量平均方程同样出现湍流标量通量：
+\begin{equation}
+ \frac{\partial\Theta}{\partial t}+U_j\frac{\partial\Theta}{\partial x_j}
+ =\alpha\nabla^2\Theta-\frac{\partial\avg{u_j'\theta'}}{\partial x_j}+\avg{q_\theta}.
+\end{equation}
+梯度扩散假设常写成 $\avg{u_j'\theta'}=-\alpha_t\partial\Theta/\partial x_j$，但在旋转、分离、强各向异性或非局部输运中可能失效。
+
+\section{运动方程的不变性}
+
+物理方程不应依赖观察者的平移、恒定速度平移或坐标旋转。Galilean 变换
+\begin{equation}
+ x_i^*=x_i-V_it,\qquad u_i^*=u_i-V_i
+\end{equation}
+不改变不可压缩 Navier--Stokes 方程形式。湍流模型和数值格式也应尽量保持这一性质；例如模型不应把绝对平均速度大小误当作湍流产生机制，而应依赖速度梯度、应变率和客观张量组合。
+
+\section{涡量}
+
+涡量定义为
+\begin{equation}
+ \bm\omega=\nabla\times\bm u.
+\end{equation}
+它等于流体微团局部角速度的两倍，但“涡量大”“存在涡结构”和“流体绕某中心旋转”并非同义。简单剪切流具有非零涡量却未必有紧凑涡核；势涡可表现为绕转却在核心外涡量为零。识别涡结构需结合压力、速度梯度特征值或 $Q$、$\lambda_2$ 等判据。
+
+\sourcefigure{82}{160}{460}{383}{660}{0.34}{边界层中以 $Q$ 判据识别的发卡状涡结构，颜色表示局部流向速度。涡结构具有明显三维性并跨越多个尺度。}
+
+利用恒等式
+\begin{equation}
+ (\bm u\cdot\nabla)\bm u=\nabla\left(\frac{u^2}{2}\right)-\bm u\times\bm\omega,
+\end{equation}
+动量方程可写成包含 Lamb 矢量 $\bm\omega\times\bm u$ 的形式。对不可压缩、物性恒定流取旋度，得到涡量方程
+\begin{equation}
+ \frac{D\bm\omega}{Dt}=(\bm\omega\cdot\nabla)\bm u+\nu\nabla^2\bm\omega.
+\end{equation}
+右侧第一项是涡量拉伸与倾斜。在二维不可压缩流中它为零；三维流中，沿涡线方向的拉伸会因角动量效应增大涡量，并产生更小横向尺度。它是三维湍流小尺度生成和正向能量级联的关键机制。
+
+\section*{练习与数据分析提示}
+\begin{enumerate}
+ \item 证明 Reynolds 平均后的非线性项可写成 $U_j\partial_jU_i+\partial_j\avg{u_i'u_j'}$。
+ \item 从有限速度记录计算均值、均方根、偏度和峰度，并用分块平均估计不确定度。
+ \item 计算自相关并比较首次过零积分尺度与指数拟合尺度。
+ \item 对通道 DNS 数据验证 $R_{ij}$ 的对称性、近壁极限和 $2k=R_{ii}$。
+ \item 分别考察刚体旋转、简单剪切和势涡，说明涡量与“涡”的区别。
+\end{enumerate}
+
+\subsection*{原书进阶练习译文}
+\begin{enumerate}[label=\arabic*.]
+ \item 对长度为 $T$ 的有限速度记录推导样本均值和样本方差。将记录分成 $N_b$ 个互不重叠区块，用区块均值方差估计均值的标准误差；说明当区块长度小于积分时间尺度时为何会低估不确定度。
+ \item 给定通道流三分量时间序列，计算联合概率密度 $p(u',v')$、协方差与相关系数。用四象限 $u'v'$ 事件识别喷射和扫掠，并比较强事件阈值对 Reynolds 剪切应力贡献的影响。
+ \item 对均匀各向同性速度场证明 $R_{ij}(\bm r)$ 只能由纵向和横向两个标量相关函数表示。利用不可压缩条件推导两者的微分关系，并检查 $r\to0$ 极限。
+ \item 由热线时间记录计算 Euler 自相关；由粒子轨迹计算 Lagrangian 自相关。解释二者积分时间尺度为何不同，并在存在稳定平均对流时检验 Taylor 假设。
+ \item 从瞬时 Navier--Stokes 方程完整推导 RANS 方程，逐项标出哪些平均规则被使用。若平均窗口随空间变化，指出平均与微分不交换时新增的交换项。
+ \item 对被动标量推导平均方程和标量通量方程。列出梯度扩散模型失效的三类流动，并从非局部输运、反梯度通量或各向异性角度解释原因。
+ \item 分别计算刚体旋转、平面 Couette 流、势涡和 Lamb--Oseen 涡的涡量。比较流线、涡量分布、$Q$ 判据和局部角速度，说明任何单一“涡判据”都需要阈值和物理语境。
+ \item 从动量方程取旋度推导一般可压缩涡量方程，识别膨胀、斜压、黏性和涡量拉伸项；再说明密度恒定不可压缩极限中哪些项消失。
+ \item 以涡管为材料体，利用 Kelvin 环量定理和截面积变化解释涡量拉伸。若涡管长度增长为原来的 $a$ 倍且体积不变，估计截面积、涡量和旋转时间尺度变化。
+\end{enumerate}
+\chapter{湍流能量学}
+
+湍流能量方程把平均流做功、脉动能产生、空间输运和黏性耗散联系起来，是理解流动维持机制及建立模型的核心工具。
+
+\section{平均动能}
+
+用 $U_i$ 乘 RANS 动量方程，并利用不可压缩条件，可得单位质量平均动能 $K=U_iU_i/2$ 的方程：
+\begin{align}
+ \frac{\partial K}{\partial t}+U_j\frac{\partial K}{\partial x_j}
+ =&-\frac{\partial}{\partial x_j}\left(\frac{PU_j}{\rho}
+ -2\nu U_iS_{ij}+U_i\avg{u_i'u_j'}\right)\nonumber\\
+ &-2\nu S_{ij}S_{ij}+\avg{u_i'u_j'}S_{ij}+U_if_i,
+\end{align}
+其中 $S_{ij}=(\partial_jU_i+\partial_iU_j)/2$。散度项只重新分配能量；$-2\nu S_{ij}S_{ij}$ 是平均流的直接黏性耗散；$\avg{u_i'u_j'}S_{ij}$ 在典型剪切流中为负，表示平均动能转移给湍动能。
+
+\section{湍动能}
+
+从瞬时方程减去平均方程得到脉动方程，再与 $u_i'$ 相乘并平均：
+\begin{equation}
+ \frac{\partial k}{\partial t}+U_j\frac{\partial k}{\partial x_j}
+ =P_k-\varepsilon-\frac{\partial T_j}{\partial x_j},
+\end{equation}
+其中
+\begin{align}
+ k&=\frac12\avg{u_i'u_i'},\\
+ P_k&=-\avg{u_i'u_j'}\frac{\partial U_i}{\partial x_j},\\
+ \varepsilon&=2\nu\avg{s_{ij}'s_{ij}'},\\
+ T_j&=\frac12\avg{u_i'u_i'u_j'}+\frac{\avg{p'u_j'}}{\rho}-2\nu\avg{u_i's_{ij}'}.
+\end{align}
+$P_k$ 是平均剪切对湍流所做的功；$\varepsilon$ 始终非负，把湍动能不可逆地转成内能；$T_j$ 包含湍流输运、压力输运与黏性扩散。
+
+平均动能方程中的交换项与 $P_k$ 大小相等、符号相反。因此平均动能与湍动能之和的方程中该项严格抵消，说明“产生”并不创造总机械能，只是把能量从平均场转交给脉动场。
+
+\section{通道流中的湍动能收支}
+
+充分发展通道流只沿壁法向 $y$ 非均匀，产生项简化为
+\begin{equation}
+ P_k=-\avg{u'v'}\frac{\dd U}{\dd y}.
+\end{equation}
+壁面处脉动速度为零，$k$ 与 $P_k$ 均为零；耗散仍可有限，因为速度梯度不为零。产生峰值位于缓冲层，外层中产生和耗散大体平衡，剩余差异由输运项承担。压力输运和湍流输运把能量从产生强的区域搬运到近壁区与外层，而黏性扩散主要局限在壁面附近。
+
+采用壁面单位
+\begin{equation}
+ y^+=\frac{yu_\tau}{\nu},\qquad U^+=\frac{U}{u_\tau},
+\end{equation}
+可比较不同 $\Rey_\tau$ 的近壁收支。低 Reynolds 数下黏性影响向外延伸；随 $\Rey_\tau$ 增大，近壁峰与外层运动逐渐表现出尺度分离。
+
+\section{脉动涡量平方与湍流拟涡能}
+
+脉动拟涡能常定义为 $\Omega'=\avg{\omega_i'\omega_i'}/2$。其方程包含平均与脉动应变对涡量的拉伸、平均涡量梯度作用、空间输运和黏性破坏。关键项
+\begin{equation}
+ \avg{\omega_i'\omega_j's_{ij}'}
+\end{equation}
+代表脉动涡量被脉动应变拉伸，是小尺度间歇性的重要来源。黏性项涉及涡量梯度平方，因此比动能耗散更偏向最高波数。
+
+对不可压缩均匀湍流，平均耗散与涡量平方具有关系
+\begin{equation}
+ \varepsilon=\nu\avg{\omega_i'\omega_i'}.
+\end{equation}
+在有壁或非均匀流动中，局部还会出现散度修正，不能不加条件地逐点套用。
+
+\sourcefigure{108}{142}{360}{402}{660}{0.46}{Taylor--Green 涡演化的相邻时刻。原先较平滑的涡结构被拉伸并产生更细尺度，直观展示拟涡能增长和局部各向同性趋向。}
+
+\section{标量脉动方差}
+
+令 $\theta=\Theta+\theta'$，标量方差 $k_\theta=\avg{\theta'^2}/2$ 满足
+\begin{equation}
+ \frac{Dk_\theta}{Dt}=
+ -\avg{u_j'\theta'}\frac{\partial\Theta}{\partial x_j}
+ -\alpha\avg{\frac{\partial\theta'}{\partial x_j}
+                 \frac{\partial\theta'}{\partial x_j}}
+ -\frac{\partial}{\partial x_j}\left(
+ \frac12\avg{u_j'\theta'^2}-\alpha\frac{\partial k_\theta}{\partial x_j}\right).
+\end{equation}
+第一项是平均标量梯度产生，第二项是标量耗散率 $\chi/2$，其余是输运。速度场负责拉伸标量界面、形成细丝和陡峭梯度；分子扩散最终抹平这些小尺度。Schmidt 数 $\mathrm{Sc}=\nu/D$ 或 Prandtl 数决定标量最小尺度相对 Kolmogorov 尺度的大小。
+
+\section{衰减各向同性湍流的能量学}
+
+无平均剪切、无外力且空间均匀时，输运与产生项消失，
+\begin{equation}
+ \frac{\dd k}{\dd t}=-\varepsilon.
+\end{equation}
+若大尺度积分尺度 $L$ 与能量满足某个近似不变量，可得到幂律衰减 $k\sim t^{-n}$。实验和 DNS 中指数 $n$ 并非普适常数，它受初始低波数谱、有限计算域、Reynolds 数和衰减阶段影响。判断幂律时，应允许虚拟时间原点：
+\begin{equation}
+ k=A(t-t_0)^{-n},
+\end{equation}
+并同时检验局部指数，而不能只在对数坐标上凭直线外观判断。
+
+\section{Reynolds 应力输运方程}
+
+各分量 $R_{ij}=\avg{u_i'u_j'}$ 的精确输运方程可写为
+\begin{equation}
+ \frac{DR_{ij}}{Dt}=P_{ij}+\Pi_{ij}-\varepsilon_{ij}
+ -\frac{\partial T_{ijk}}{\partial x_k},
+\end{equation}
+其中
+\begin{align}
+ P_{ij}&=-R_{ik}\frac{\partial U_j}{\partial x_k}
+         -R_{jk}\frac{\partial U_i}{\partial x_k},\\
+ \Pi_{ij}&=\avg{\frac{p'}{\rho}
+ \left(\frac{\partial u_i'}{\partial x_j}+\frac{\partial u_j'}{\partial x_i}\right)},\\
+ \varepsilon_{ij}&=2\nu\avg{\frac{\partial u_i'}{\partial x_k}
+                                  \frac{\partial u_j'}{\partial x_k}}.
+\end{align}
+压力-应变项 $\Pi_{ij}$ 的迹为零，因此不改变总湍动能，却在三个法向应力之间重新分配能量，通常趋向恢复各向同性。耗散张量在足够高 Reynolds 数且远离壁面时常近似各向同性，但近壁区和中等 Reynolds 数下该近似并不可靠。
+
+\subsection{均匀剪切流与压力-应变相关}
+
+均匀剪切流取 $U_1=Sx_2$。产生首先向流向脉动注入能量，随后压力-应变把一部分转移到横向与展向分量。若没有这种再分配，法向应力各向异性会不断增强。经典“慢项”模型与各向异性张量成正比，描述回归各向同性；“快项”则直接响应平均应变和旋转。
+
+定义各向异性张量
+\begin{equation}
+ b_{ij}=\frac{R_{ij}}{2k}-\frac13\delta_{ij}.
+\end{equation}
+其不变量受到可实现性限制。模型预测若越出 Lumley 三角形或产生负法向应力，就违反了 $R_{ij}$ 半正定这一基本要求。
+
+\subsection{通道流 Reynolds 应力收支}
+
+通道中 $\avg{u'^2}$ 的产生最强；压力-应变把能量转给 $\avg{v'^2}$ 和 $\avg{w'^2}$。壁面阻挡使法向速度迅速衰减，压力重新分配呈现明显近壁各向异性。剪切应力 $-\avg{u'v'}$ 直接联系平均动量输运，并与黏性剪切共同满足总应力线性分布。
+
+\sourcefigure{115}{176}{454}{418}{658}{0.30}{充分发展通道流中流向 Reynolds 正应力的收支。产生、压力—应变、输运与耗散在近壁区具有不同符号和峰值位置。}
+\sourcefigure{115}{180}{176}{418}{366}{0.27}{充分发展通道流中壁法向 Reynolds 正应力的收支。压力—应变负责从流向分量向其他分量再分配能量。}
+
+\section*{练习提示}
+\begin{enumerate}
+ \item 从 RANS 方程推导平均动能方程，并逐项解释其物理意义。
+ \item 验证平均动能与湍动能方程中的交换项严格抵消。
+ \item 用通道 DNS 数据绘制 $P_k^+$、$\varepsilon^+$ 和输运项随 $y^+$ 的变化并检查积分平衡。
+ \item 证明压力-应变项的迹为零。
+ \item 对衰减湍流同时拟合 $t_0$ 与 $n$，比较不同拟合区间的敏感性。
+\end{enumerate}
+
+\subsection*{原书进阶练习译文}
+\begin{enumerate}[label=\arabic*.]
+ \item 从瞬时动能方程出发分别作 Reynolds 平均与体积分，证明周期盒中压力输运和空间散度项积分为零。统计定常强迫湍流中验证输入功率等于耗散。
+ \item 对通道流 DNS 数据逐项计算 $k$ 方程。采用中心差分、谱导数和守恒残差三种方法估计导数，比较近壁峰对数值方法的敏感性，并报告收支未闭合量。
+ \item 把 $P_k=-R_{ij}\partial_jU_i$ 分解为平均应变与平均旋转贡献，证明对称的 $R_{ij}$ 与反对称旋转张量收缩为零。因此湍动能产生只直接依赖平均应变，而 Reynolds 应力各分量仍可受旋转影响。
+ \item 推导均匀衰减湍流中 $\dd k/\dd t=-\varepsilon$。假设 $\varepsilon=C_\varepsilon k^{3/2}/L$，分别结合 Saffman 与 Loitsyansky 大尺度不变量求衰减指数；讨论有限盒和低 Reynolds 数为何破坏幂律。
+ \item 由标量方程推导标量方差 $\avg{\theta'^2}/2$ 的收支。对恒定平均标量梯度的均匀湍流，说明生产项
+ \begin{equation*}-\avg{u_j'\theta'}\frac{\partial\Theta}{\partial x_j}\end{equation*}
+ 如何维持标量脉动，并检验统计定常时生产与耗散的平衡。
+ \item 推导 Reynolds 应力方程，证明压力-应变项迹为零、产生项的半迹等于 $P_k$。将压力-应变分成慢项和快项，说明各自对回归各向同性与快速畸变的作用。
+ \item 用 $b_{ij}=R_{ij}/(2k)-\delta_{ij}/3$ 计算各向异性不变量。将一分量、二分量和三分量极限画在不变量图中，并检查给定实验数据是否落在可实现区域。
+ \item 对通道流的 $R_{11}$、$R_{22}$、$R_{33}$ 收支解释：为什么生产直接进入流向分量，壁面法向分量仍能维持非零能量，以及压力-应变在壁面附近为何呈现“壁面回声”效应。
+\end{enumerate}
+\chapter{湍流的谱描述}
+
+物理空间统计描述“相隔多远的两点仍相关”，谱空间描述“不同尺度分别含有多少能量”。两者通过 Fourier 变换互相联系。谱分析使能量级联、惯性区间、数值分辨率和滤波作用能够以尺度为坐标直接呈现。
+
+\section{尺度分解}
+
+任意具有足够规则性的场都可分解为不同波数的 Fourier 模态。大波长对应小波数，小波长对应大波数。对湍流而言，单个 Fourier 模态通常不代表一个局部可见“旋涡”，但一段波数带可表征相近尺度运动的统计贡献。
+
+若一维信号 $u(x)$ 的平均为零，其连续 Fourier 变换对定义为
+\begin{align}
+ \widehat u(\kappa)&=\frac{1}{2\pi}\int_{-\infty}^{\infty}u(x)e^{-i\kappa x}\dd x,\\
+ u(x)&=\int_{-\infty}^{\infty}\widehat u(\kappa)e^{i\kappa x}\dd\kappa.
+\end{align}
+实值信号满足 $\widehat u(-\kappa)=\widehat u^*(\kappa)$。导数在谱空间中变成代数乘法：$\widehat{\partial_xu}=i\kappa\widehat u$；卷积的 Fourier 变换等于变换的乘积。
+
+\section{相关函数与能谱}
+
+均匀一维场的自相关为
+\begin{equation}
+ R(r)=\avg{u(x)u(x+r)}.
+\end{equation}
+Wiener--Khinchin 定理表明，相关函数与功率谱密度互为 Fourier 变换：
+\begin{equation}
+ R(r)=\int_{-\infty}^{\infty}\Phi(\kappa)e^{i\kappa r}\dd\kappa,
+ \qquad
+ \Phi(\kappa)=\frac{1}{2\pi}\int_{-\infty}^{\infty}R(r)e^{-i\kappa r}\dd r.
+\end{equation}
+$R(0)=\avg{u^2}$，因此谱面积等于方差。谱密度非负，其量纲是“方差乘长度”。
+
+\subsection{三维推广}
+
+均匀湍流的谱张量定义为相关张量的三维 Fourier 变换：
+\begin{equation}
+ \Phi_{ij}(\bm\kappa)=\frac{1}{(2\pi)^3}\int R_{ij}(\bm r)
+ e^{-i\bm\kappa\cdot\bm r}\dd\bm r.
+\end{equation}
+不可压缩条件给出 $\kappa_i\Phi_{ij}=0$。各向同性时，谱张量只能由 $\delta_{ij}$ 与 $\kappa_i\kappa_j$ 构成：
+\begin{equation}
+ \Phi_{ij}(\bm\kappa)=\frac{E(\kappa)}{4\pi\kappa^2}
+ \left(\delta_{ij}-\frac{\kappa_i\kappa_j}{\kappa^2}\right).
+\end{equation}
+三维能谱 $E(\kappa)$ 归一化为
+\begin{equation}
+ k=\int_0^\infty E(\kappa)\dd\kappa,
+ \qquad
+ \varepsilon=2\nu\int_0^\infty \kappa^2E(\kappa)\dd\kappa.
+\end{equation}
+第二个关系显示，动能偏重大尺度，而耗散因 $\kappa^2$ 权重集中在小尺度。
+
+\subsection{一维能谱与 Taylor 假设}
+
+实验探针常只得到沿一条线或随时间变化的速度，因此测得的是一维谱。流向一维谱由横向波数积分得到，并不等于把三维谱简单取在某条轴上。各向同性条件下，一维纵向和横向谱可由 $E(\kappa)$ 的积分表示，也可通过微分关系相互转换。
+
+Taylor 冻结假设以平均对流速度 $U_c$ 将频率 $f$ 转成流向波数：
+\begin{equation}
+ \kappa_1=\frac{2\pi f}{U_c}.
+\end{equation}
+它要求湍流结构在通过探针期间的自身演化与随机扫掠弱于平均平移。强剪切、低平均速度、逆流或大尺度快速演化时，频谱不能直接解释为空间谱。
+
+\subsection{衰减湍流中的谱演化}
+
+衰减各向同性湍流中，低波数含能区控制积分尺度，中间波数可形成惯性区，高波数为耗散区。随时间推进，谱峰向低波数移动，总面积减小，说明特征尺度增长而动能衰减。有限周期盒限制最小波数；若积分尺度接近盒长，低波数谱会受计算域污染。
+
+\sourcefigure{133}{118}{460}{432}{655}{0.31}{衰减均匀各向同性湍流的模型能谱演化。随时间增长，谱面积减小、特征波数向低波数移动，而耗散截止也发生变化。}
+
+\section{离散 Fourier 级数}
+
+对长度 $L$ 的周期区间，$N$ 个等距样点 $x_n=n\Delta x$，离散变换可写为
+\begin{align}
+ \widehat u_m&=\frac1N\sum_{n=0}^{N-1}u_ne^{-i2\pi mn/N},\\
+ u_n&=\sum_{m=0}^{N-1}\widehat u_me^{i2\pi mn/N}.
+\end{align}
+波数间隔为 $\Delta\kappa=2\pi/L$，Nyquist 波数为 $\kappa_N=\pi/\Delta x$。采样不足会把高于 Nyquist 的成分折叠到低波数，称为混叠。Parseval 关系保证物理空间平方和与谱空间模平方和一致，是程序实现的重要单元测试。
+
+有限非周期记录直接 FFT 会把端点不连续解释为高频成分，引起谱泄漏。常用窗函数在降低泄漏的同时拓宽谱峰并改变能量归一化；因此必须给出窗函数、分段长度、重叠率和归一化方式。Welch 方法把长记录分段、加窗并平均，可显著减小谱估计方差。
+
+\subsection{离散互相关与卷积}
+
+循环互相关可由一个序列的变换共轭与另一个序列的变换相乘后逆变换获得。FFT 默认周期延拓；若需要线性相关，应使用零填充避免尾首环绕。卷积定理同样允许用 $O(N\log N)$ 运算替代直接 $O(N^2)$ 求和。
+
+\subsection{通道流一维谱}
+
+通道流在流向与展向周期或统计均匀，可在每个壁法向位置分别做一维或二维变换。预乘谱 $\kappa E(\kappa)$ 在对数波数坐标下的面积等于能量，因此能直观看出每个对数尺度带的贡献。波长常以壁面单位 $\lambda^+$ 或外尺度 $h$ 归一化，用来区分近壁条带、对数层大尺度运动和外层超大尺度运动。
+
+\subsection{周期盒各向同性湍流三维谱}
+
+对三维离散速度场计算 FFT 后，把波矢落在球壳 $[\kappa-\Delta\kappa/2,\kappa+\Delta\kappa/2)$ 内的模态能量求和，得到壳平均谱。低波数球壳中的格点很少，统计各向同性误差较大；高波数处还必须检查去混叠截止和离散导数的有效波数。
+
+\section*{练习提示}
+\begin{enumerate}
+ \item 从相关函数推导谱面积等于速度方差，并验证量纲。
+ \item 对正弦信号叠加噪声，比较矩形窗、Hann 窗和 Welch 平均的谱泄漏与方差。
+ \item 用 Parseval 关系检查 FFT 归一化；错误的 $N$ 或 $2\pi$ 因子应能被立即发现。
+ \item 从通道 DNS 计算 $k_xE_{uu}(k_x,y)$，分别用 $\lambda_x^+$ 和 $\lambda_x/h$ 作图。
+ \item 构造壳平均三维谱并检查 $\int E\dd\kappa=k$ 与耗散积分。
+\end{enumerate}
+
+\subsection*{原书进阶练习译文}
+\begin{enumerate}[label=\arabic*.]
+ \item 证明实值信号的 Fourier 系数具有 Hermitian 对称性，并据此说明单边谱为何要把正、负波数能量合并。给出角波数谱与循环频率谱之间的 $2\pi$ 换算。
+ \item 从 $R(r)$ 与 $\Phi(\kappa)$ 的 Fourier 对偶关系推导 Parseval 定理。对有限采样信号实现两种 FFT 归一化，确保物理空间方差与离散谱积分一致。
+ \item 生成含两个相近频率正弦波的有限记录，比较矩形、Hann 和 Blackman 窗。量化主瓣宽度、旁瓣泄漏和幅值修正，解释频率分辨率与方差降低之间的权衡。
+ \item 实现 Welch 谱估计，改变分段长度与重叠率。用独立随机实现测量谱估计方差，说明更多重叠段并不等于同样数量的独立样本。
+ \item 对通道速度场计算二维谱 $E_{uu}(k_x,k_z;y)$，再沿一个方向积分得到一维谱。验证二维谱积分与局部 $\avg{u'^2}$ 相符，并识别近壁条带的典型波长。
+ \item 对周期盒数据按整数波矢球壳求三维谱。比较简单球壳求和、按壳体积归一化和模态数补偿，讨论最低几个波数壳统计各向同性误差。
+ \item 用时间频谱和已知空间谱检验 Taylor 假设。分别采用局部平均速度、中心线速度和由时空相关峰值得到的对流速度，比较转换后的谱。
+ \item 人工构造一个含高于 Nyquist 频率的信号，展示混叠后的错误低频峰。改变采样率和抗混叠低通滤波，给出避免混叠所需的采样条件。
+\end{enumerate}
+\chapter{湍流运动的尺度}
+
+\section{谱空间 Navier--Stokes 方程}
+
+对周期、不可压缩速度场作 Fourier 变换，压力可通过无散投影消去：
+\begin{equation}
+ \left(\frac{\partial}{\partial t}+\nu\kappa^2\right)\widehat u_i(\bm\kappa)
+ =-iP_{ij}(\bm\kappa)\kappa_m
+ \widehat{u_ju_m}(\bm\kappa),
+\end{equation}
+其中
+\begin{equation}
+ P_{ij}=\delta_{ij}-\frac{\kappa_i\kappa_j}{\kappa^2}
+\end{equation}
+是投影到与 $\bm\kappa$ 正交平面的算子。乘积 $u_ju_m$ 在谱空间中成为卷积，因此一个波数模态与所有满足 $\bm p+\bm q=\bm\kappa$ 的模态三元组相互作用。
+
+非线性项在无黏、周期条件下守恒总动能，却能在波数之间重新分配能量。压力也不改变总动能；它确保不可压缩，并在速度分量间重新分配能量。
+
+\section{非线性与能量级联}
+
+谱能量方程写成
+\begin{equation}
+ \frac{\partial E(\kappa,t)}{\partial t}=T(\kappa,t)-2\nu\kappa^2E(\kappa,t)+F(\kappa,t),
+\end{equation}
+其中 $T$ 为非线性传递谱，$F$ 为外力输入谱。非线性守恒要求
+\begin{equation}
+ \int_0^\infty T(\kappa)\dd\kappa=0.
+\end{equation}
+谱通量定义为跨过波数 $\kappa$ 向更小尺度传递的能量率：
+\begin{equation}
+ \Pi(\kappa)=-\int_0^\kappa T(p)\dd p.
+\end{equation}
+三维湍流的平均正向级联表现为惯性区 $\Pi(\kappa)\simeq\varepsilon>0$。这并不意味着每个瞬时三元组都向高波数输运；局部反向传递可以存在，净统计通量仍指向小尺度。
+
+\sourcefigure{159}{108}{270}{432}{660}{0.52}{传递谱与能谱的尺度图景：能量在低波数输入，经惯性子区以近似恒定通量传向高波数，并在小尺度耗散。}
+
+\section{能谱动力学}
+
+低波数含能区直接受几何、平均剪切和外力影响；高波数耗散区由黏性主导；二者之间若尺度分离充分，可出现对输入和黏性均不敏感的惯性区。达到统计定常时，总能量输入等于总耗散：
+\begin{equation}
+ \int F\dd\kappa=\varepsilon.
+\end{equation}
+能量跨尺度传递时间量级为涡周转时间 $\tau_\ell\sim\ell/u_\ell$。大尺度寿命长、含能多；尺度越小，周转越快，直到黏性时间与非线性时间相当。
+
+\sourcefigure{160}{104}{430}{432}{658}{0.36}{均匀各向同性湍流中的能谱、耗散谱和传递谱。传递谱总积分为零，但在不同波数带具有相反符号。}
+
+\section{Kolmogorov 尺度}
+
+Kolmogorov 1941 理论假设足够高 Reynolds 数下最小尺度只由 $\nu$ 与平均耗散率 $\varepsilon$ 决定。量纲分析给出
+\begin{equation}
+ \eta=\left(\frac{\nu^3}{\varepsilon}\right)^{1/4},\qquad
+ u_\eta=(\nu\varepsilon)^{1/4},\qquad
+ \tau_\eta=\left(\frac{\nu}{\varepsilon}\right)^{1/2}.
+\end{equation}
+对应微尺度 Reynolds 数 $u_\eta\eta/\nu=1$，表示黏性与惯性效应同阶。若大尺度耗散估计 $\varepsilon\sim U^3/L$，则
+\begin{equation}
+ \frac{\eta}{L}\sim\Rey_L^{-3/4},\quad
+ \frac{u_\eta}{U}\sim\Rey_L^{-1/4},\quad
+ \frac{\tau_\eta}{L/U}\sim\Rey_L^{-1/2}.
+\end{equation}
+
+\sourcefigure{162}{122}{155}{420}{350}{0.30}{不同 Reynolds 数混合层的可视化。大尺度卷起位置相近，而高 Reynolds 数情形包含数量更多、尺度更小的结构。}
+
+局部耗散具有强间歇性，因此局部最小尺度并不恒等于用平均 $\varepsilon$ 得到的 $\eta$。K41 描述的是统计相似性的第一近似，高阶结构函数会显示间歇修正。
+
+\section{Kolmogorov 惯性子区}
+
+惯性区中若谱只依赖 $\varepsilon$ 与 $\kappa$，量纲分析给出著名的 $-5/3$ 定律：
+\begin{equation}
+ E(\kappa)=C_K\varepsilon^{2/3}\kappa^{-5/3}.
+\end{equation}
+补偿谱 $E(\kappa)\kappa^{5/3}\varepsilon^{-2/3}$ 在理想惯性区应形成平台，其高度为 Kolmogorov 常数 $C_K$。有限 Reynolds 数、各向异性、瓶颈效应和谱估计方法都会缩短或扭曲平台，不能仅凭局部斜率断言存在完整惯性区。
+
+二阶纵向结构函数
+\begin{equation}
+ D_{LL}(r)=\avg{[u_L(\bm x+\bm r)-u_L(\bm x)]^2}
+\end{equation}
+在惯性区满足 $D_{LL}=C_2(\varepsilon r)^{2/3}$。更强的精确结果是各向同性、局部定常条件下的四分之五定律：
+\begin{equation}
+ \avg{(\delta u_L)^3}=-\frac45\varepsilon r.
+\end{equation}
+负号直接反映三维能量净向小尺度传递。这是少数不含经验常数的湍流精确关系。
+
+\section{Taylor 微尺度}
+
+Taylor 微尺度由小分离处相关函数曲率定义。各向同性条件下
+\begin{equation}
+ \lambda^2=\frac{\avg{u_1'^2}}{\avg{(\partial u_1'/\partial x_1)^2}},
+ \qquad
+ \varepsilon=15\nu\frac{u'^2}{\lambda^2},
+\end{equation}
+其中 $u'^2$ 是任一速度分量方差。Taylor 微尺度位于积分尺度和 Kolmogorov 尺度之间，但不是能谱中一个尖锐的动力学分界。常用 Taylor Reynolds 数
+\begin{equation}
+ \Rey_\lambda=\frac{u'\lambda}{\nu}
+\end{equation}
+表征各向同性湍流的尺度分离程度。
+
+\section{涡量与标量场的特征尺度}
+
+涡量含一个空间导数，因而相对速度更强调小尺度。涡管直径常为若干 $\eta$，但长度可延伸到惯性区尺度。速度梯度和耗散率的概率分布具有厚尾，显示小尺度并非完全 Gaussian 或均匀随机。
+
+对被动标量，最小尺度取决于 Schmidt 数 $\mathrm{Sc}=\nu/D$。当 $\mathrm{Sc}>1$，速度在 $\eta$ 以下已光滑，标量仍被应变拉成更细结构，Batchelor 尺度为
+\begin{equation}
+ \eta_B=\eta\mathrm{Sc}^{-1/2}.
+\end{equation}
+当 $\mathrm{Sc}<1$，标量扩散在速度耗散尺度之前起作用，Obukhov--Corrsin 尺度量级为
+\begin{equation}
+ \eta_{OC}=\eta\mathrm{Sc}^{-3/4}.
+\end{equation}
+高 Schmidt 数混合问题需要比速度场更细的网格；若只按 $\eta$ 设计分辨率，标量耗散会被低估。
+
+惯性-对流区的标量谱为
+\begin{equation}
+ E_\theta(\kappa)=C_\theta\chi\varepsilon^{-1/3}\kappa^{-5/3},
+\end{equation}
+其中 $\chi=2D\avg{|\nabla\theta'|^2}$。高 Schmidt 数还可出现 Batchelor 的 $\kappa^{-1}$ 黏性-对流区。
+
+\section*{练习提示}
+\begin{enumerate}
+ \item 用量纲分析重新推导 $\eta,u_\eta,\tau_\eta$。
+ \item 从 $\varepsilon\sim U^3/L$ 推导 DNS 网格点数随 $\Rey_L^{9/4}$ 的增长。
+ \item 对给定谱计算 $k$、$\varepsilon$、积分尺度和 Taylor 微尺度，并检查单位。
+ \item 绘制 $-5/3$ 补偿谱与谱通量，说明仅凭斜率为何不足以确认惯性区。
+ \item 对不同 $\mathrm{Sc}$ 比较 $\eta_B$、$\eta$ 与 $\eta_{OC}$，据此制定标量 DNS 网格要求。
+\end{enumerate}
+
+\subsection*{原书进阶练习译文}
+\begin{enumerate}[label=\arabic*.]
+ \item 从 Fourier 空间不可压缩方程证明投影算子 $P_{ij}$ 满足 $P_{ij}\kappa_j=0$、$P_{ik}P_{kj}=P_{ij}$，并说明压力如何被投影消去。
+ \item 写出三模相互作用 $\bm k+\bm p+\bm q=0$ 的能量交换，证明单个三元组内总能量守恒。数值生成随机无散模态，验证非线性项全谱积分为零。
+ \item 从传递谱 $T(k)$ 计算谱通量 $\Pi(k)$。对强迫统计定常 DNS 同时画出输入、通量和黏性耗散，确定是否存在 $\Pi\simeq\varepsilon$ 的平台。
+ \item 用量纲分析推导 Kolmogorov 尺度与 $L/\eta\sim\Rey_L^{3/4}$。对飞机、海洋和实验风洞的代表参数估算尺度比、DNS 网格点数及时间步数。
+ \item 对若干 Reynolds 数能谱绘制 $k^{5/3}E(k)\varepsilon^{-2/3}$ 补偿谱。区分真正平台、瓶颈凸起和低波数污染，并用通量平台作交叉判据。
+ \item 从 K\'arm\'an--Howarth 方程推导惯性区四分之五定律所需的定常、局部各向同性和高 Reynolds 数假设。用纵向速度增量数据计算二、三阶结构函数。
+ \item 由纵向相关函数在 $r=0$ 的曲率推导 Taylor 微尺度，并验证 $\varepsilon=15\nu u'^2/\lambda^2$。比较谱积分、梯度方差和相关曲率三种计算方法。
+ \item 对 $\mathrm{Sc}=10^{-2},1,10^2$ 分别计算 $\eta_{OC}$、$\eta$、$\eta_B$。设计同时解析速度与标量耗散的网格，并估计三维单元数增加倍数。
+ \item 分析高 Schmidt 数标量谱，寻找惯性-对流区 $-5/3$ 斜率与黏性-对流区 $-1$ 斜率。说明有限 Reynolds 数下两区间可能重叠或缺失。
+\end{enumerate}
+\chapter{自由剪切流}
+
+自由剪切流在远离固壁处由速度差形成，包括射流、尾迹和混合层。它们的平均场在下游逐渐展宽，中心速度差衰减，并持续卷吸周围无旋或低湍流度流体。远离入口后，许多自由剪切流趋向自相似状态。
+
+\section{自相似性}
+
+若不同下游位置的剖面通过适当速度尺度 $U_s(x)$、宽度尺度 $\delta(x)$ 和中心位置 $y_c(x)$ 可塌缩为同一函数，
+\begin{equation}
+ U(x,y)=U_s(x)F\!\left(\eta\right),\qquad
+ \eta=\frac{y-y_c(x)}{\delta(x)},
+\end{equation}
+则称流动自保持或自相似。自相似并非仅是曲线看起来接近；所选尺度必须与守恒积分、控制方程和边界条件一致。
+
+\sourcefigure{187}{112}{548}{435}{662}{0.24}{平面湍流射流由过渡区进入自相似区的示意。中心线速度衰减，而射流半宽沿下游增长。}
+\sourcefigure{187}{108}{385}{435}{500}{0.23}{平面湍流尾迹由过渡区进入自相似区的示意。速度亏损衰减，尾迹宽度沿下游增长。}
+\sourcefigure{187}{108}{215}{435}{345}{0.25}{平面湍流混合层由过渡区进入自相似区的示意。两股来流的速度差驱动剪切层增厚。}
+
+边界层近似下，二维平均动量方程为
+\begin{equation}
+ U\frac{\partial U}{\partial x}+V\frac{\partial U}{\partial y}
+ =-\frac{\partial\avg{u'v'}}{\partial y},
+\end{equation}
+这里忽略分子黏性及流向湍流输运。结合质量和动量积分约束，可确定相似尺度的下游幂律。
+
+\subsection{平面射流}
+
+静止环境中的平面射流具有恒定动量通量
+\begin{equation}
+ M=\int_{-\infty}^{\infty}U^2\dd y=\text{常数}.
+\end{equation}
+若 $U_c$ 是中心线速度、$\delta$ 是半宽度，则 $U_c^2\delta\sim M$。实验和高 Reynolds 数理论给出 $\delta\sim x-x_0$，因此
+\begin{equation}
+ U_c\sim(x-x_0)^{-1/2}.
+\end{equation}
+$x_0$ 为虚拟原点，代表近场对远场标度的位移修正。射流平均速度常近似 Gaussian 形；Reynolds 剪切应力在中心线两侧异号，并在有限 $|\eta|$ 处达到峰值。
+
+\subsection{平面尾迹}
+
+均匀来流 $U_\infty$ 中的尾迹保持动量亏损积分
+\begin{equation}
+ \int_{-\infty}^{\infty}U(U_\infty-U)\dd y=\text{常数}.
+\end{equation}
+远尾迹中速度亏损 $\Delta U=U_\infty-U$ 相对 $U_\infty$ 较小，积分约束变为 $\Delta U_c\delta=\text{常数}$。取湍流扩散尺度后得到
+\begin{equation}
+ \delta\sim(x-x_0)^{1/2},\qquad
+ \Delta U_c\sim(x-x_0)^{-1/2}.
+\end{equation}
+与射流相比，尾迹由背景来流提供固定对流速度，因此宽度增长指数不同。
+
+\subsection{平面混合层}
+
+两股速度 $U_1$ 与 $U_2$ 的平行流汇合形成混合层。速度差 $\Delta U=U_1-U_2$ 在下游近似不变，层厚通常线性增长：
+\begin{equation}
+ \delta\sim C_\delta(x-x_0).
+\end{equation}
+对流速度约为两侧速度的加权平均。速度比、密度比、可压缩性和来流边界层状态都会改变增长率。高 convective Mach 数下，压力扰动跨层传播受限，混合层增长通常受到抑制。
+
+\section{卷吸与动量通量}
+
+卷吸是周围流体被吸入湍流区的过程，是自由剪切流展宽的直接机制。对平面射流，体积流率
+\begin{equation}
+ Q(x)=\int_{-\infty}^{\infty}U\dd y
+\end{equation}
+随 $x$ 增大，而动量通量保持不变。$\dd Q/\dd x$ 可解释为两侧总卷吸速度。卷吸既包括大尺度界面起伏带来的“吞并”，也包括黏性超层附近小尺度涡量扩散造成的“啃蚀”；两者在不同观察尺度下描述同一整体过程的不同方面。
+
+自由剪切流的湍流/非湍流界面高度褶皱。界面内部涡量和耗散很强，外侧流体近似无旋。使用涡量阈值识别界面时，结果依赖阈值和滤波尺度，必须做敏感性检查。
+
+\section{自由剪切湍流结构}
+
+射流和混合层近场常出现 Kelvin--Helmholtz 卷起的大尺度相干涡。涡配对使尺度增大，三维二次不稳定性继而生成流向涡和小尺度湍流。充分发展区仍保留大尺度有序运动，但相位和幅值具有随机性。
+
+\sourcefigure{204}{106}{492}{450}{660}{0.27}{反应剪切层的顶视与侧视可视化。大尺度卷起结构随下游发展逐渐发生三维变形。}
+\sourcefigure{204}{142}{332}{400}{440}{0.23}{剪切层中二次流向结构形成机理示意：跨展向的涡管受到应变和诱导速度作用，产生流向涡量。}
+
+尾迹结构受物体脱涡影响。圆柱尾迹在较低 Reynolds 数下形成近周期 von K\'arm\'an 涡街；随 Reynolds 数升高，剪切层更早转捩，小尺度活动增强。射流中大尺度结构对噪声辐射和混合效率尤其重要，主动控制常通过特定频率激励改变其卷起和配对。
+
+条件平均可在指定事件（例如界面位置、速度峰或涡核）附近恢复典型结构，但条件平均图不等同于任一瞬时结构。POD 和 DMD 等模态方法也能提取含能或相干运动，却依赖内积、变量和采样方式。
+
+\section*{练习提示}
+\begin{enumerate}
+ \item 用守恒积分推导平面射流 $U_c\sim x^{-1/2}$ 与尾迹 $\Delta U_c\sim x^{-1/2}$。
+ \item 从数据拟合虚拟原点，说明忽略 $x_0$ 会如何扭曲增长率。
+ \item 计算射流体积流率与卷吸率，并检查动量通量是否沿程守恒。
+ \item 用不同涡量阈值提取湍流/非湍流界面，报告界面位置统计的敏感性。
+ \item 比较射流、尾迹与混合层的速度尺度、宽度尺度和主要不稳定机制。
+\end{enumerate}
+
+\subsection*{原书进阶练习译文}
+\begin{enumerate}[label=\arabic*.]
+ \item 由平面射流动量通量守恒和线性展宽推导中心线速度衰减。对实验剖面分别采用半高宽、动量厚度和 Gaussian 拟合宽度，比较虚拟原点和增长率。
+ \item 对平面尾迹从动量亏损积分出发，在远尾迹近似下推导 $\Delta U_c\sim x^{-1/2}$、$\delta\sim x^{1/2}$。检验近尾迹中忽略 $\Delta U^2$ 项造成的误差。
+ \item 对两侧速度为 $U_1,U_2$ 的混合层定义涡量厚度和动量厚度。比较不可压缩速度比变化及 convective Mach 数增大时的增长率。
+ \item 把测得的射流剖面按 $U_c$ 与半宽度归一化，检验平均速度、Reynolds 应力和高阶统计量是否同时自相似。解释“平均剖面塌缩”为何不足以证明完全自保持。
+ \item 由 $Q(x)=\int U\dd y$ 计算平面射流卷吸率。分别以平均流横向速度和控制体质量守恒估计卷吸，检查两者一致性。
+ \item 用涡量阈值识别湍流/非湍流界面，计算界面高度、长度和条件平均速度。改变阈值与空间滤波尺度，说明界面几何为何不具有完全客观的单一答案。
+ \item 对混合层可视化确定 Kelvin--Helmholtz 卷起频率与涡间距；追踪涡配对后尺度加倍过程，并讨论三维二次不稳定性何时破坏二维相干涡。
+ \item 比较射流噪声控制、尾迹减阻和燃烧混合增强中对大尺度结构的操纵目标，说明同一种激励为何可能改善一种性能却恶化另一种性能。
+\end{enumerate}
+\chapter{近壁湍流}
+
+壁面既通过无滑移条件产生强速度梯度和涡量，又阻挡法向运动并引入显著各向异性。近壁区同时包含黏性尺度与外层尺度，是湍流理论、实验和建模中最具挑战性的区域之一。
+
+\section{通道流运动方程}
+
+考虑两平行壁间距 $2h$ 的充分发展通道流，平均速度为 $U(y)$，恒定压力梯度驱动流动。平均流向动量方程为
+\begin{equation}
+ 0=-\frac{1}{\rho}\frac{\dd P}{\dd x}
+ +\nu\frac{\dd^2U}{\dd y^2}
+ -\frac{\dd\avg{u'v'}}{\dd y}.
+\end{equation}
+
+\sourcefigure{215}{112}{558}{428}{660}{0.22}{平板湍流边界层的油膜可视化。近壁结构在流向上延伸，并呈现显著的横向不均匀性。}
+从壁面积分到 $y$ 得总剪切应力
+\begin{equation}
+ \tau_{\mathrm{tot}}(y)=\rho\nu\frac{\dd U}{\dd y}-\rho\avg{u'v'}
+ =\tau_w\left(1-\frac{y}{h}\right),
+\end{equation}
+其中此处 $y=0$ 在下壁、$y=h$ 在中心线。总应力线性分布是通道 DNS 与实验最基本的守恒检查。
+
+壁面摩擦应力与压力梯度满足
+\begin{equation}
+ \tau_w=-h\frac{\dd P}{\dd x},\qquad
+ u_\tau=\sqrt{\frac{\tau_w}{\rho}}.
+\end{equation}
+若采用恒体积流量计算，压力梯度随时间调节；若采用恒压力梯度，体积流量会随统计状态变化。两种驱动方式的瞬时全局约束不同。
+
+\section{黏性单位}
+
+由 $u_\tau$ 与 $\nu$ 构造的内尺度为
+\begin{equation}
+ \ell_\nu=\frac{\nu}{u_\tau},\qquad
+ y^+=\frac{y}{\ell_\nu},\qquad U^+=\frac{U}{u_\tau}.
+\end{equation}
+在壁面 $-\avg{u'v'}=0$，总应力完全由黏性承担，故
+\begin{equation}
+ \left.\frac{\dd U^+}{\dd y^+}\right|_w=1.
+\end{equation}
+黏性单位使不同 Reynolds 数的近壁平均剖面在有限 $y^+$ 范围内近似塌缩，但外层大尺度会随 $\Rey_\tau$ 增大而调制近壁运动，因此“完全普适”只是近似。
+
+\section{平均速度剖面}
+
+\subsection{壁面律}
+
+黏性底层中 Reynolds 应力可忽略，积分得
+\begin{equation}
+ U^+=y^+.
+\end{equation}
+离壁更远、但仍满足 $y\ll h$ 时，若黏性和外尺度影响都可忽略，量纲分析给出对数律
+\begin{equation}
+ U^+=\frac{1}{\kappa}\ln y^+ + B,
+\end{equation}
+其中 $\kappa$ 为 von K\'arm\'an 常数，$B$ 为光滑壁截距。黏性底层与对数区之间的缓冲层两种应力均重要，不能用简单幂律或对数律精确描述。
+
+总应力关系可写成
+\begin{equation}
+ \frac{\dd U^+}{\dd y^+}-\avg{u'v'}^+=1-\frac{y}{h}.
+\end{equation}
+在对数区若 Reynolds 应力接近 $u_\tau^2$，则平均速度梯度约为 $1/(\kappa y)$。
+
+\subsection{速度亏损律}
+
+外层以 $h$ 和 $u_\tau$ 缩放。中心线速度 $U_c$ 与局部速度之差满足
+\begin{equation}
+ \frac{U_c-U}{u_\tau}=F\!\left(\frac{y}{h}\right).
+\end{equation}
+内外展开在重叠区匹配产生对数形式。实际高 Reynolds 数边界层还具有尾迹修正，压力梯度、粗糙度和几何会改变外层函数。
+
+\subsection{Clauser 图法求壁面摩擦}
+
+实验中若不能直接测量 $\tau_w$，可调节 $u_\tau$ 使测得速度剖面在半对数坐标上与假定对数律吻合。该 Clauser 图法依赖所选 $\kappa$、$B$ 和有效对数区范围；在低 Reynolds 数、强压梯度、分离邻近或粗糙壁条件下可能产生系统误差。可靠结果应与动量积分或直接壁面测量交叉验证。
+
+\section{Reynolds 剪切应力的混合长度模型}
+
+Boussinesq 涡黏假设写为
+\begin{equation}
+ -\avg{u'v'}=\nu_t\frac{\dd U}{\dd y}.
+\end{equation}
+Prandtl 混合长度模型取
+\begin{equation}
+ \nu_t=\ell_m^2\left|\frac{\dd U}{\dd y}\right|,
+\end{equation}
+并在对数区令 $\ell_m=\kappa y$，即可导出对数律。混合长度不是流体微团真实保持身份飞行的确定距离，而是表征湍流动量交换的模型尺度。
+
+近壁需用阻尼函数使 $\ell_m$ 比 $y$ 更快趋零；外层则受通道半高或边界层厚度限制。代数模型能解释简单平衡剪切流，却无法普遍处理历史效应、分离、旋转和三维应变。
+
+\subsection{湍流传热与 Reynolds 类比}
+
+定义湍流热扩散率 $\alpha_t$ 及湍流 Prandtl 数
+\begin{equation}
+ \Pran_t=\frac{\nu_t}{\alpha_t},\qquad
+ -\avg{v'\theta'}=\alpha_t\frac{\dd\Theta}{\dd y}.
+\end{equation}
+若动量与热量输运机制相近，$\Pran_t$ 为 $O(1)$，可建立摩擦系数与 Stanton 数之间的 Reynolds 类比。精确类比要求边界条件、物性和源项相容；强温变物性、浮力、可压缩性及粗糙度会破坏它。
+
+\section{壁湍流结构}
+
+近壁区存在流向高速和低速条带，其典型展向间距约为 $O(100)$ 个壁面单位。准流向涡使低速流体离壁抬升（喷射）并把高速流体扫向壁面（扫掠），形成强 Reynolds 剪切应力事件。条带摆动、抬升和破裂是近壁循环的不同表现，但不应被理解为严格周期的单一序列。
+
+\sourcefigure{233}{140}{320}{402}{660}{0.50}{平板湍流边界层近壁结构的顶视图。低速条带发生摆动、抬升并形成发卡状涡，展向间距约为百余壁面单位。}
+
+随 Reynolds 数提高，外层出现长度达若干边界层厚度的超大尺度运动。它们贡献低波数流向能量，并对近壁小尺度振幅产生调制。内外层不是独立系统，而通过压力、剪切和跨尺度相互作用耦合。
+
+壁面阻挡导致 $v'$ 比 $u'$、$w'$ 更快趋零。由连续方程和无滑移条件可得近壁展开
+\begin{equation}
+ u'\sim y,\qquad w'\sim y,\qquad v'\sim y^2,\qquad
+ -\avg{u'v'}\sim y^3.
+\end{equation}
+这些渐近关系是近壁模型和数值数据质量的重要检验。
+
+\section*{练习提示}
+\begin{enumerate}
+ \item 从通道平均动量方程推导总应力线性分布。
+ \item 用 DNS 数据验证 $U^+=y^+$、对数律及近壁脉动幂律。
+ \item 比较直接壁面梯度、压力梯度和 Clauser 图法得到的 $u_\tau$。
+ \item 由混合长度假设推导对数律，并指出每一步假设。
+ \item 对二维联合概率 $p(u',v')$ 做象限分析，量化喷射与扫掠对 $-\avg{u'v'}$ 的贡献。
+\end{enumerate}
+
+\enlargethispage{5\baselineskip}
+\subsection*{原书进阶练习译文}
+\begin{enumerate}[label=\arabic*.,itemsep=0.05em,topsep=0.2em]
+ \item 从通道流控制体受力平衡推导 $\tau_w=-h\dd P/\dd x$，并由局部平均动量方程推导总应力线性分布。使用 DNS 数据量化离散残差。
+ \item 给定 $U(y)$，分别用壁面梯度、压力梯度、全局功率输入和 Clauser 图法计算 $u_\tau$。比较数值求导、采样误差和对数常数选择造成的偏差。
+ \item 将多个 $\Rey_\tau$ 的平均剖面以壁面单位与外尺度作图，识别黏性底层、缓冲层、对数区和外层。计算诊断函数 $\beta=y^+\dd U^+/\dd y^+$，避免仅凭直线外观判断对数律。
+ \item 从混合长度 $\ell_m=\kappa y$ 和近似恒定 Reynolds 剪切应力推导对数律。加入 van Driest 阻尼后考察 $\ell_m^+$ 在壁面附近的渐近行为。
+ \item 推导定热流通道中的平均温度方程和总热流分布。计算湍流 Prandtl 数随壁距变化，并检验 Reynolds 类比在黏性底层、对数区和外层的适用性。
+ \item 用二维联合概率密度进行 $u'v'$ 四象限分析。分别积分喷射、扫掠和相互作用事件，改变孔径阈值，量化强间歇事件对总剪切应力的贡献。
+ \item 从无滑移与连续方程推导 $u'\sim y$、$w'\sim y$、$v'\sim y^2$、$\avg{u'v'}\sim y^3$。用 DNS 最近壁的若干点拟合指数，说明网格或插值误差如何破坏渐近律。
+ \item 计算近壁流向预乘谱，识别条带尺度和外层大尺度峰。用大尺度低通信号对近壁小尺度包络作条件平均，量化幅值调制。
+\end{enumerate}
+\chapter{湍流建模与预测}
+
+工程尺度通常无法解析全部湍流自由度。RANS 对全部脉动取平均，只求平均场；LES 显式解析大尺度、模型化亚格子尺度；DNS 解析从含能尺度到耗散尺度，不引入湍流模型。三者并非简单的“低、中、高精度”排序，而是对可解析信息、计算成本和模型误差作不同取舍。
+
+\section{RANS 建模}
+
+Boussinesq 假设用涡黏度把 Reynolds 应力各向异性部分与平均应变联系：
+\begin{equation}
+ -\avg{u_i'u_j'}=2\nu_tS_{ij}-\frac23k\delta_{ij}.
+\end{equation}
+它保证应力张量与应变张量共轴，适合许多附着剪切流，但对强旋转、曲率、分离、二次流和快速畸变往往不足。各模型主要差别在于如何确定 $\nu_t$ 及相关尺度。
+
+\subsection{零方程模型}
+
+代数模型直接给定混合长度或涡黏度，例如
+\begin{equation}
+ \nu_t=\ell_m^2\sqrt{2S_{ij}S_{ij}}.
+\end{equation}
+其代价低、稳定且易实现，但尺度完全由局部几何和经验函数指定，不能描述输运、滞后和非局部历史。它们适合简单平衡边界层，不适合作为复杂流动的通用模型。
+
+\subsection{单方程模型}
+
+单方程模型为一个湍流尺度量求输运方程，再用代数关系补另一个尺度。典型形式可写为
+\begin{equation}
+ \frac{D\widetilde\nu}{Dt}=P_{\widetilde\nu}-D_{\widetilde\nu}
+ +\frac{\partial}{\partial x_j}\left[\left(\nu+\frac{\widetilde\nu}{\sigma}\right)
+ \frac{\partial\widetilde\nu}{\partial x_j}\right].
+\end{equation}
+Spalart--Allmaras 模型以修正涡黏变量为未知量，针对航空附着边界层构造。生产、破坏、壁距和转捩处理包含经验校准，其适用范围不能只由方程阶数判断。
+
+\subsection{两方程模型}
+
+$k$--$\varepsilon$ 模型以 $k$ 和耗散率 $\varepsilon$ 决定
+\begin{equation}
+ \nu_t=C_\mu\frac{k^2}{\varepsilon}.
+\end{equation}
+其输运方程的典型形式为
+\begin{align}
+ \frac{Dk}{Dt}&=P_k-\varepsilon+
+ \frac{\partial}{\partial x_j}\left[\left(\nu+\frac{\nu_t}{\sigma_k}\right)\partial_jk\right],\\
+ \frac{D\varepsilon}{Dt}&=C_{\varepsilon1}\frac{\varepsilon}{k}P_k
+ -C_{\varepsilon2}\frac{\varepsilon^2}{k}
+ +\frac{\partial}{\partial x_j}\left[\left(\nu+\frac{\nu_t}{\sigma_\varepsilon}\right)\partial_j\varepsilon\right].
+\end{align}
+$k$--$\omega$ 模型用比耗散率 $\omega\sim\varepsilon/k$，近壁积分更自然，但对自由来流 $\omega$ 边界条件敏感。SST 模型在近壁使用 $k$--$\omega$，外层过渡到 $k$--$\varepsilon$，并限制剪切应力以改善逆压梯度分离预测。
+
+模型常数来自一组典型流校准。增加方程并不自动保证普适性；应检查网格收敛、入口湍流量、壁面处理、转捩假设和模型形式不确定度。
+
+\subsection{Reynolds 应力模型与二阶封闭}
+
+Reynolds 应力模型直接求六个 $R_{ij}$ 输运方程，并另求尺度方程。它保留应力各向异性及其输运，可描述旋转、曲率和二次流，但压力-应变、湍流扩散和耗散张量仍需建模。通用结构为
+\begin{equation}
+ \frac{DR_{ij}}{Dt}=P_{ij}+\Pi_{ij}^{\mathrm{model}}
+ -\varepsilon_{ij}^{\mathrm{model}}+D_{ij}^{\mathrm{model}}.
+\end{equation}
+模型必须维持 $R_{ij}$ 半正定，否则会产生负湍动能或非物理法向应力。数值求解也比标量涡黏模型更耦合、更刚性。
+
+\section{大涡模拟}
+
+\subsection{滤波}
+
+LES 定义空间滤波量
+\begin{equation}
+ \overline{u_i}(\bm x)=\int G(\bm x,\bm r;\Delta)u_i(\bm x-\bm r)\dd\bm r.
+\end{equation}
+$\Delta$ 是滤波尺度。均匀无限域中滤波可与微分交换；近壁、非均匀网格或变滤波宽度下会出现交换误差。实际有限体积/有限差分 LES 中，网格、离散算子和显式滤波共同决定有效滤波，通常无法与理论滤波器完全等同。
+
+常见滤波器包括盒式、Gaussian 和谱截止滤波。谱截止对可分辨和不可分辨模态分界清晰，但物理空间核非局部；盒式滤波局部且与有限体积平均自然对应，却具有振荡的传递函数。
+
+\sourcefigure{249}{122}{432}{418}{660}{0.34}{LES 的尺度划分示意。大于滤波宽度的尺度被显式解析，小尺度的净作用由亚格子模型表示。}
+\sourcefigure{249}{226}{210}{454}{335}{0.19}{瞬时速度信号与其滤波结果。滤波去除高波数波动，保留可解析的大尺度分量。}
+
+\subsection{控制方程}
+
+滤波不可压缩方程为
+\begin{align}
+ \partial_i\overline u_i&=0,\\
+ \frac{\partial\overline u_i}{\partial t}+\overline u_j\partial_j\overline u_i
+ &=-\frac1\rho\partial_i\overline p+\nu\nabla^2\overline u_i
+ -\partial_j\tau_{ij}^{\mathrm{sgs}},
+\end{align}
+其中亚格子应力
+\begin{equation}
+ \tau_{ij}^{\mathrm{sgs}}=\overline{u_iu_j}-\overline u_i\,\overline u_j.
+\end{equation}
+其迹可并入修正压力，偏差部分需模型化。亚格子应力代表被滤掉尺度对可解析尺度的作用，不等于 RANS Reynolds 应力。
+
+\sourcefigure{250}{152}{538}{352}{660}{0.23}{通道 DNS 的展向涡量场及其滤波结果。滤波保留大尺度组织，同时移除细小高波数结构。}
+
+可解析动能方程中的亚格子传递为
+\begin{equation}
+ \Pi_{\mathrm{sgs}}=-\tau_{ij}^{\mathrm{sgs}}\overline S_{ij}.
+\end{equation}
+其平均通常为正，表示向未解析尺度传能；局部可为负，称为反向散射。稳定模型不应通过无依据的钳位把所有反向散射删除，但离散与模型组合必须保持可控的能量行为。
+
+\subsection{亚格子尺度参数化}
+
+Smagorinsky 模型为
+\begin{equation}
+ \tau_{ij}^{d}=-2\nu_t\overline S_{ij},\qquad
+ \nu_t=(C_s\Delta)^2|\overline S|.
+\end{equation}
+它纯耗散、稳健，但不能自然在层流区和壁面消失，并可能过度阻尼转捩与大尺度结构。壁面阻尼函数可缓解近壁问题，却引入经验壁距。
+
+动态模型引入更大的测试滤波器，利用 Germano 恒等式从可解析尺度间关系求模型系数。局部系数可能波动和为负，常沿均匀方向、Lagrangian 路径或局部邻域平均以提高统计稳定性。平均策略必须尊重流动非均匀性，不能跨越不相干区域。
+
+尺度相似模型能表示应力结构和反向散射，但平均耗散不足；混合模型把相似项与涡黏项组合。WALE、Vreman 等模型依据速度梯度不变量构造，在近壁渐近性和剪切适应性方面各有优势。
+
+\subsection{壁面解析与壁面模型 LES}
+
+壁面解析 LES（WRLES）必须解析近壁条带和缓冲层，流向、展向网格以壁面单位计，代价随 Reynolds 数急剧增加。外流高 Reynolds 数下，壁面附近网格点占总成本的主导。
+
+壁面模型 LES（WMLES）不解析全部内层，而由壁面模型根据第一层 LES 速度、压力梯度和热状态给出壁面应力或热流。平衡壁模型常使用对数律；非平衡模型求简化边界层方程。模型高度应位于可与外层 LES 匹配的区域，过低会重新承受近壁网格成本，过高则忽略重要非平衡效应。
+
+\section*{练习提示}
+\begin{enumerate}
+ \item 比较零方程、单方程、两方程和 Reynolds 应力模型所引入的未知量与假设。
+ \item 检查某 RANS 结果的 Reynolds 应力可实现性与总动量守恒。
+ \item 对 DNS 场施加不同滤波器，计算真实 $\tau_{ij}^{\mathrm{sgs}}$ 和 $\Pi_{\mathrm{sgs}}$。
+ \item 实现静态与动态 Smagorinsky 系数，比较平均耗散及反向散射分布。
+ \item 为给定 $\Rey_\tau$ 估算 WRLES 与 WMLES 网格成本，并说明壁模型高度选择。
+\end{enumerate}
+
+\subsection*{原书进阶练习译文}
+\begin{enumerate}[label=\arabic*.]
+ \item 对平衡边界层从 Boussinesq 假设与混合长度构造零方程涡黏模型。检查壁面、边界层边缘及均匀流中的极限。
+ \item 对给定 $k$、$\varepsilon$ 场计算 $\nu_t=C_\mu k^2/\varepsilon$，进行量纲和正性检查。推导无生产均匀衰减时标准 $k$--$\varepsilon$ 模型的幂律。
+ \item 比较 $k$--$\varepsilon$ 与 $k$--$\omega$ 自由来流边界条件。改变入口 $\omega$ 数个数量级，考察附着边界层与自由剪切区的敏感性。
+ \item 计算 Reynolds 应力张量特征值和各向异性不变量。若某模型产生负特征值，说明其违反可实现性，并分析简单裁剪为何可能破坏输运方程一致性。
+ \item 对 DNS 速度场施加盒式、Gaussian 和谱截止滤波，比较核函数与传递函数。检查滤波宽度变化时滤波与微分的交换误差。
+ \item 直接计算真实亚格子应力 $\tau_{ij}=\overline{u_iu_j}-\bar u_i\bar u_j$，将其与 Smagorinsky 模型比较。分别评估张量相关、平均 SGS 耗散和耗散概率密度。
+ \item 实现 Germano 动态过程，计算局部 $C_s^2$。比较平面平均、局部盒平均和 Lagrangian 平均，说明平均方向必须与统计均匀性一致。
+ \item 对通道 LES 统计分子耗散、SGS 耗散和数值残余耗散。若三者总和不闭合，定位时间离散、压力投影或边界处理中的能量误差。
+ \item 给定工程 Reynolds 数，估算 WRLES 近壁网格数随 $\Rey$ 的增长；再设计 WMLES 网格和模型高度，列出平衡壁模型在分离、强压力梯度和非定常流中的缺陷。
+\end{enumerate}
+\chapter{高保真湍流模拟的数值问题}
+
+DNS 和 LES 的目标不是只让离散方程“稳定运行”，而是在长时间、宽波数范围内正确表示动能、涡量和标量方差的产生、传递与耗散。小的相位误差、混叠误差或人工耗散会在非线性级联中累积并改变统计量。
+
+\section{数值微分}
+
+有限差分导数对 Fourier 模态 $e^{i\kappa x}$ 的作用可用修正波数 $\kappa^*$ 表示。以二阶中心差分为例，
+\begin{equation}
+ \frac{u_{j+1}-u_{j-1}}{2\Delta x}
+ =i\kappa^*u_j,\qquad
+ \kappa^*\Delta x=\sin(\kappa\Delta x).
+\end{equation}
+当 $\kappa\Delta x$ 接近 $\pi$ 时，$\kappa^*$ 严重低估真实波数，Nyquist 模态甚至具有零离散导数。因此“每波长两个点”只能避免采样歧义，远不足以准确求导。高阶显式、紧致差分和谱方法的主要优势是扩大准确修正波数范围。
+
+\sourcefigure{269}{225}{58}{456}{255}{0.33}{不同有限差分格式的修正波数。高阶和交错格式在更宽波数范围内接近精确直线，但网格截止附近仍会失真。}
+
+离散 Laplace 算子的修正波数决定黏性耗散谱。若一阶与二阶导数不相容，离散能量平衡和实际耗散会偏离连续方程。
+
+\section{非线性混叠}
+
+网格上两个可解析高波数模态相乘会产生超出 Nyquist 波数的分量。离散采样把它折回低波数，造成非物理能量转移。伪谱方法常采用 $3/2$ 零填充或等价的 $2/3$ 截止规则精确去除二次非线性的混叠。
+
+有限差分/有限体积中混叠更隐蔽，不能只靠删除最高 Fourier 模态解释。过积分、分裂形式、显式滤波或适当耗散可减轻它。诊断时应检查谱尾、能量预算和网格加密，而不只看解是否发散。
+
+\section{无黏极限的动能守恒}
+
+连续不可压缩方程的对流项有等价形式：
+\begin{align}
+ C_i^{\mathrm{adv}}&=u_j\partial_ju_i,\\
+ C_i^{\mathrm{div}}&=\partial_j(u_ju_i),\\
+ C_i^{\mathrm{skew}}&=\frac12\left[u_j\partial_ju_i+\partial_j(u_ju_i)\right],\\
+ C_i^{\mathrm{rot}}&=\omega_j\epsilon_{ijk}u_k+\partial_i(u_ju_j/2).
+\end{align}
+连续无散条件下它们等价；离散后乘积法则和 $\partial_ju_j=0$ 只近似成立，形式选择会改变能量行为。偏斜对称或专门的 kinetic-energy-preserving 分裂形式能使离散对流算子对速度内积不做净功。
+
+守恒不仅取决于对流公式，也依赖离散梯度、散度和内积之间的伴随关系，以及边界通量。若 $D=-G^T$（在适当质量矩阵意义下），压力对无散速度不做功。非正交网格和边界处理必须保持对应的离散恒等式。
+
+\subsection{交错网格}
+
+经典交错网格把压力置于单元中心、速度法向分量置于相应面上，使质量通量和压力梯度自然耦合，并避免同位网格的棋盘压力模态。通过一致插值构造面上动量通量，可获得离散动能守恒。复杂网格上，同位布置通常更方便，但需要 Rhie--Chow 类压力-速度耦合与仔细的能量分析。
+
+\section{数值耗散对湍流的影响}
+
+迎风格式通过耗散抑制网格尺度振荡，对激波和间断必要；但在光滑不可压缩湍流中，过强人工耗散会提前截断级联、降低小尺度能量并改变 Reynolds 应力和分离。中心格式耗散低，却需要解决混叠、非线性稳定性和欠分辨能量堆积。
+
+\sourcefigure{276}{112}{425}{425}{540}{0.24}{圆柱尾迹的两组数值结果。展向分辨率不足的计算出现过早转捩，说明数值噪声和欠分辨可能改变真实失稳路径。}
+
+比较格式时应绘制动能谱、耗散谱与能量通量，而不只比较某个平均量。一个格式即使给出正确总耗散，也可能把耗散施加在错误波数范围。LES 中数值耗散还会与 SGS 模型竞争；若隐式耗散已占主导，再叠加强 SGS 模型会双重计入耗散。
+
+隐式 LES 利用截断误差充当亚格子模型，只有当数值耗散的尺度选择性、网格依赖和守恒性质被清楚量化时才具有可解释性。单纯把“没有显式模型”的欠分辨计算称为 LES 并不足够。
+
+\section{DNS 与 LES 的计算域和网格}
+
+\subsection{均匀方向的计算域}
+
+周期域必须足够大以容纳最大含能结构。若域长过短，最低波数缺失，结构会与自身周期像相互作用，相关函数在半域长前不能衰减，低波数谱出现异常离散峰。检查方法包括扩大域、比较积分尺度、观察两点相关和低波数统计。
+
+通道流最小计算盒可能复现近壁循环，却不能表示外层大尺度运动；得到的摩擦系数或局部统计不能自动代表完整大域流动。自由剪切流的横向边界必须远离湍流区，并允许卷吸流体进入。
+
+\subsection{解析重要结构的网格}
+
+各向同性 DNS 常要求 $\kappa_{\max}\eta$ 达到约 1 或更高，具体阈值依赖离散方法和研究对象。若关注高阶梯度、间歇性或高 Schmidt 数标量，需要更严格分辨率。
+
+壁湍流 DNS/WRLES 的网格应分别以 $\Delta x^+$、$\Delta z^+$ 和第一点 $y_1^+$ 报告，同时检查局部修正波数与网格拉伸。仅给单元总数无法判断分辨率。非均匀网格的最大拉伸率也应受控，以避免反射和离散误差突然变化。
+
+时间步需满足 CFL 限制，并解析最小动力学时间尺度。显式黏性项还可能要求
+\begin{equation}
+ \Delta t=O\!\left(\frac{\Delta x^2}{\nu}\right).
+\end{equation}
+统计收敛时间则由积分时间尺度决定，远长于数值稳定所需的单步尺度。
+
+\section{典型流动的边界条件}
+
+\subsection{通道流}
+
+流向与展向采用周期边界，壁面使用无滑移、不可穿透条件。驱动可指定恒压力梯度或恒流量。压力 Poisson 方程的零模必须结合驱动方式处理；速度零净质量误差和总应力平衡应持续监测。
+
+\subsection{自由剪切流与空间发展边界层}
+
+自由剪切流横向边界应允许卷吸且尽量减少反射。空间发展边界层需要真实的湍流入口；简单叠加不相关随机噪声通常不能快速形成正确的谱、应力和相干结构，会产生漫长调整区。
+
+常用入口方法包括前驱周期计算、循环-重标度、数字滤波和合成涡方法。入口不仅要匹配均值和 Reynolds 应力，还应考虑长度尺度、时间相关、无散约束及与压力场的相容性。
+
+\subsection{入口与出口}
+
+出口应让涡结构和声学/压力扰动尽量无反射离开。纯零梯度条件只在对流占主导且无显著回流时近似合理。回流出口会把未定义湍流信息带入计算域，必须扩大域或采用能够处理入流特征的边界条件，不能靠静默裁剪速度掩盖。
+
+缓冲区或海绵层可逐渐松弛到目标状态，减小反射；但松弛强度和长度会影响物理解，应通过域长和参数敏感性验证。
+
+\section*{高保真模拟检查清单}
+\begin{enumerate}
+ \item 报告空间离散、时间推进、网格、去混叠或滤波策略，以及所有显式/隐式耗散。
+ \item 验证质量、动量和动能预算；压力功与对流净功应符合离散理论。
+ \item 用谱、相关函数和 $\kappa_{\max}\eta$ 检查域长与分辨率。
+ \item 分离统计误差、离散误差、有限域误差和模型误差，不能只给一次计算曲线。
+ \item 延长采样并用积分时间尺度估计有效独立样本数和置信区间。
+ \item 对 LES 比较数值耗散、SGS 耗散和分子耗散的尺度分布。
+\end{enumerate}
+
+\subsection*{原书进阶练习译文}
+\begin{enumerate}[label=\arabic*.]
+ \item 推导二、四、六阶中心差分一阶导数的修正波数。求每种格式相对误差低于 $1\%$ 时每波长至少需要的网格点数，并与形式阶数排序比较。
+ \item 对二阶非线性构造两个接近 Nyquist 的 Fourier 模态，解析求它们乘积的真实波数和离散混叠波数。用 $3/2$ 规则实现去混叠并验证误差消失。
+ \item 在周期无黏计算中分别使用 advective、divergence、skew-symmetric 和 rotational 对流形式。监测离散动能随时间的漂移，解释离散无散误差和乘积法则误差。
+ \item 对交错网格推导面速度、单元压力和动量通量的位置关系。证明内部面对相邻控制体的动能交换反对称，并检查压力梯度与散度的离散伴随性。
+ \item 用同一初场比较中心、低耗散迎风和高耗散迎风格式。绘制能谱、耗散谱和总动能衰减；指出“总耗散相同”不保证尺度分布正确。
+ \item 对圆柱尾迹改变展向域长和展向网格数。若低分辨率计算比高分辨率更早转捩，利用修正波数、数值噪声和剪切层不稳定性解释这一反直觉结果。
+ \item 为均匀各向同性 DNS 选择 $L_{box}$、$N^3$ 和 $\Delta t$，同时满足低波数相关衰减、$k_{max}\eta$ 与 CFL 条件。把内存、每步浮点量和统计所需周转时间转换为总成本。
+ \item 设计空间发展边界层的合成湍流入口，使其匹配均值、Reynolds 应力和积分尺度并近似无散。比较随机噪声、数字滤波与前驱循环方法的调整长度。
+ \item 对含回流的出口测试零梯度、对流和特征边界条件。比较压力反射、质量守恒和回流稳定性；说明为什么直接把回流速度裁为零会改变物理问题。
+\end{enumerate}
+\backmatter
+\chapter*{术语索引（中英对照）}
+\addcontentsline{toc}{chapter}{术语索引（中英对照）}
+\markboth{术语索引（中英对照）}{术语索引（中英对照）}
+\begin{longtable}{p{.43\textwidth}p{.47\textwidth}}
+\toprule 中文术语 & 英文术语\\ \midrule
+各向同性湍流 & isotropic turbulence\\
+非均匀性；非定常性 & inhomogeneity; non-stationarity\\
+雷诺分解；Favre 分解 & Reynolds decomposition; Favre decomposition\\
+雷诺应力；湍动能 & Reynolds stress; turbulent kinetic energy\\
+压力-应变相关 & pressure--strain correlation\\
+耗散率；标量耗散率 & dissipation rate; scalar dissipation rate\\
+涡量；涡量拉伸；拟涡能 & vorticity; vortex stretching; enstrophy\\
+两点相关；积分尺度 & two-point correlation; integral scale\\
+能谱；谱通量；传递谱 & energy spectrum; spectral flux; transfer spectrum\\
+含能区；惯性子区；耗散区 & energy-containing range; inertial subrange; dissipation range\\
+Kolmogorov 尺度；Taylor 微尺度 & Kolmogorov scale; Taylor microscale\\
+结构函数；四分之五定律 & structure function; four-fifths law\\
+间歇性；瓶颈效应 & intermittency; bottleneck effect\\
+Batchelor 尺度；Schmidt 数 & Batchelor scale; Schmidt number\\
+自由剪切流；卷吸 & free-shear flow; entrainment\\
+自相似；虚拟原点 & self-similarity; virtual origin\\
+湍流/非湍流界面 & turbulent/non-turbulent interface\\
+摩擦速度；黏性单位 & friction velocity; viscous units\\
+壁面律；速度亏损律 & law of the wall; velocity-defect law\\
+喷射；扫掠；近壁循环 & ejection; sweep; near-wall cycle\\
+混合长度；涡黏度 & mixing length; eddy viscosity\\
+封闭问题；可实现性 & closure problem; realizability\\
+雷诺平均 Navier--Stokes 方程 & Reynolds-averaged Navier--Stokes equations (RANS)\\
+大涡模拟；直接数值模拟 & large-eddy simulation (LES); direct numerical simulation (DNS)\\
+亚格子应力；动态模型 & subgrid-scale stress; dynamic model\\
+壁面解析 LES；壁面模型 LES & wall-resolved LES; wall-modeled LES\\
+修正波数；混叠；谱泄漏 & modified wavenumber; aliasing; spectral leakage\\
+偏斜对称形式；动能保持格式 & skew-symmetric form; kinetic-energy-preserving scheme\\
+入口湍流生成；海绵层 & inflow turbulence generation; sponge layer\\
+\bottomrule
+\end{longtable}
+
+\chapter*{参考文献说明}
+\addcontentsline{toc}{chapter}{参考文献说明}
+下列书目信息按原书章节顺序保留；论文名、期刊名与出版信息不翻译，以便准确检索和正式引用。
+
+\begingroup
+\small
+\sloppy
+\setlength{\parskip}{0.28em}
+\section*{第 1 章参考文献}
+\par\hangindent=2em\hangafter=1 Abkarian, M., Mendez, S., Xue, N., Yang, F. and Stone, H. A., 2020. Speech can produce jet-like transport relevant to asymptomatic spreading of virus. Proc. Natl. Acad. Sci. 117, 25237–25245.
+\par\hangindent=2em\hangafter=1 Adrian, R. J., 1991. Particle-imaging techniques for experimental fluid mechanics. Annu. Rev. Fluid Mech. 23, 261–304.
+\par\hangindent=2em\hangafter=1 Adrian, R. J., 2007. Hairpin vortex organization in wall turbulence. Phys. Fluids 19, 041301.
+\par\hangindent=2em\hangafter=1 Becker, J. V., 1940. Boundary-layer transition on the NACA 0012 and 23012 airfoils in the 8-foot high-speed wind tunnel. NACA Report L-682.
+\par\hangindent=2em\hangafter=1 Choi, H. and Moin, P., 2012. Grid-point requirements for large eddy simulation: Chapman’s estimates revisited. Phys. Fluids 24, 011702.
+\par\hangindent=2em\hangafter=1 Drazin, P. G. and Reid, W. H., 2004. Hydrodynamic Stability. Cambridge University Press.
+\par\hangindent=2em\hangafter=1 Fu, L., Karp, M., Bose, S. T., Moin, P. and Urzay, J., 2021. Shock-induced heating and transition to turbulence in a hypersonic boundary layer. J. Fluid Mech. 909, A8.
+\par\hangindent=2em\hangafter=1 Goc, K., Lehmkuhl, O., Park, G. I., Bose, S. T. and Moin, P., 2021. Large eddy simulation of aircraft at affordable cost: a milestone in computational fluid dynamics. Flow 1, E14.
+\par\hangindent=2em\hangafter=1 Gogineni, S. and Shih, C., 1997. Experimental investigation of the unsteady structure of a transitional plane wall jet. Exp. Fluids 23, 121–129.
+\par\hangindent=2em\hangafter=1 Grass, A. J., 1971. Structural features of turbulent flow over smooth and rough boundaries. J. Fluid Mech. 50, 233–255.
+\par\hangindent=2em\hangafter=1 Hack, M. J. P. and Moin, P., 2018. Coherent instability in wall-bounded shear. J. Fluid Mech. 844, 917–955.
+\par\hangindent=2em\hangafter=1 Hamman, C. W., 2018. Numerical experiments in thermal convection with and without mean shear. PhD dissertation, Stanford University.
+\par\hangindent=2em\hangafter=1 Heskestad, G., 1965. Hot-wire measurements in a plane turbulent jet. J. Appl. Mech. 32, 721–734.
+\par\hangindent=2em\hangafter=1 Homsy, G. M., 2019. Multimedia Fluid Mechanics. Cambridge University Press. www.cambridge.org/core/homsy/.
+\par\hangindent=2em\hangafter=1 Incropera, F. P., DeWitt, D. P., Bergman, T. L. and Lavine, A. S., 2007. Fundamentals of Heat and Mass Transfer. John Wiley \& Sons.
+\par\hangindent=2em\hangafter=1 Keefe, L., Moin, P. and Kim. J., 1992. The dimension of attractors underlying periodic turbulent Poiseuille flow. J. Fluid Mech. 242, 1–29.
+\par\hangindent=2em\hangafter=1 Kim, J., 1989. On the structure of pressure fluctuations in simulated turbulent channel flow. J. Fluid Mech. 205, 421–451.
+\par\hangindent=2em\hangafter=1 Kim, H. T., Kline, S. J. and Reynolds, W. C., 1971. The production of turbulence near a smooth wall in a turbulent boundary layer. J. Fluid Mech. 50, 133–160.
+\par\hangindent=2em\hangafter=1 Kolade, B. O., 2010. Experimental investigation of a three-dimensional separated diffuser. PhD dissertation, Stanford University.
+\par\hangindent=2em\hangafter=1 Kravchenko, A. G. and Moin, P., 2000. Numerical studies of flow over a circular cylinder at ReD = 3900. Phys. Fluids 12, 403–417.
+\par\hangindent=2em\hangafter=1 Le, H., Moin, P. and Kim, J., 1997. Direct numerical simulation of turbulent flow over a backward-facing step. J. Fluid Mech. 330, 349–374.
+\par\hangindent=2em\hangafter=1 Lin, J. C., 2002. Review of research on low-profile vortex generators to control boundary-layer separation. Prog. Aerosp. Sci. 38, 389–420.
+\par\hangindent=2em\hangafter=1 Lorenz, E. N., 1963. Deterministic nonperiodic flow. J. Atmos. Sci. 20, 130–141.
+\par\hangindent=2em\hangafter=1 McNutt, M. K., Camilli, R., Crone, T. J., Guthrie, G. D., Hsieh, P. A., Ryerson, T. B., Savas, O. and Shaffer, F., 2012. Review of flow rate estimates of the Deepwater Horizon oil spill. Proc. Natl. Acad. Sci. 109, 20260–20267.
+\par\hangindent=2em\hangafter=1 Moin, P. and Kim, J., 1982. Numerical investigation of turbulent channel flow. J. Fluid Mech. 118, 341–377.
+\par\hangindent=2em\hangafter=1 Moin, P. and Kim, J., 1997. Tackling turbulence with supercomputers. Sci. Am. 276, 62–68.
+\par\hangindent=2em\hangafter=1 Paoli, R. and Shariff, K., 2016. Contrail modeling and simulation. Annu. Rev. Fluid Mech. 48, 393–427.
+\par\hangindent=2em\hangafter=1 Park, G. I., Wallace, J. M., Wu, X. and Moin, P., 2012. Boundary layer turbulence in transitional and developed states. Phys. Fluids 24, 035105.
+\par\hangindent=2em\hangafter=1 Pierce, B., Moin, P. and Sayadi, T., 2013. Application of vortex identification schemes to direct numerical simulation data of a transitional boundary layer. Phys. Fluids 25, 015102.
+\par\hangindent=2em\hangafter=1 Reddy, C. M., Arey, J. S., Seewald, J. S., Sylva, S. P., Lemkau, K. L., Nelson, R. K.,
+\par\hangindent=2em\hangafter=1 Carmichael, C. A., McIntyre, C. P., Fenwick, J., Ventura, G. T., Van Mooy, B. A. S. and
+\par\hangindent=2em\hangafter=1 Camilli, R., 2012. Composition and fate of gas and oil released to the water column during the Deepwater Horizon oil spill. Proc. Natl. Acad. Sci. 109, 20229–20234.
+\par\hangindent=2em\hangafter=1 Saghafian, A., Terrapon, V. E., Ham, F. and Pitsch, H., 2011. An efficient flamelet-based combustion model for supersonic flows. AIAA Paper 2011-2267.
+\par\hangindent=2em\hangafter=1 Samimy, M., Breuer, K. S., Leal, L. G. and Steen, P. H., 2004. A Gallery of Fluid Motion. Cambridge University Press.
+\par\hangindent=2em\hangafter=1 Sayadi, T., Hamman, C. W. and Moin, P., 2013. Direct numerical simulation of complete H-type and K-type transitions with implications for the dynamics of turbulent boundary layers. J. Fluid Mech. 724, 480–509.
+\par\hangindent=2em\hangafter=1 Schmid, P. J. and Henningson, D. S., 2001. Stability and Transition in Shear Flows. Springer.
+\par\hangindent=2em\hangafter=1 Tennekes, H. and Lumley, J., 1972. A First Course in Turbulence. MIT Press (reprinted 2018).
+\par\hangindent=2em\hangafter=1 Townsend, A. A., 1980. The Structure of Turbulent Shear Flow. Cambridge University Press.
+\par\hangindent=2em\hangafter=1 Vallis, G. K., 2017. Atmospheric and Oceanic Fluid Dynamics. Cambridge University Press. Van Dyke, M., 1982. An Album of Fluid Motion. The Parabolic Press.
+\par\hangindent=2em\hangafter=1 Westerweel, J., Elsinga, G. E. and Adrian, R. J., 2013. Particle image velocimetry for complex and turbulent flows. Annu. Rev. Fluid Mech. 45, 409–436.
+\par\hangindent=2em\hangafter=1 White, F., 2006. Viscous Fluid Flow. McGraw Hill.
+\par\hangindent=2em\hangafter=1 Wu, X., Cruickshank, M. and Ghaemi, S., 2020. Negative skin friction during transition in a zero-pressure-gradient flat-plate boundary layer and in pipe flows with slip and no-slip boundary conditions. J. Fluid Mech. 887, A26.
+\par\hangindent=2em\hangafter=1 Wu, X., Moin, P. and Adrian, R. J., 2020. Laminar to fully turbulent flow in a pipe: scalar patches, structural duality of turbulent spots and transitional overshoot. J. Fluid Mech. 896, A4.
+\par\hangindent=2em\hangafter=1 Wu, X., Moin, P., Wallace, J. M., Skarda, J., Lozano-Durán, A. and Hickey, J.-P., 2017. Transitional–turbulent spots and turbulent–turbulent spots in boundary layers. P. Natl. Acad. Sci. 114, E5292–E5299.
+\par\hangindent=2em\hangafter=1 Wyngaard, J. C., 2010. Turbulence in the Atmosphere. Cambridge University Press.
+\par\hangindent=2em\hangafter=1 Yao, J. and Hussain, F., 2020. A physical model of turbulence cascade via vortex reconnection sequence and avalanche. J. Fluid Mech. 883, A51.
+\par\hangindent=2em\hangafter=1 Zhou, J., Adrian, R. J., Balachandar, S. and Kendall, T. M., 1999. Mechanisms for generating coherent packets of hairpin vortices in channel flow. J. Fluid Mech. 387, 353–396.
+\section*{第 2 章参考文献}
+\par\hangindent=2em\hangafter=1 the y-coordinate normalized by the height of the channel, if −0.5 ≤ y* ≤ 0.5 across the entire channel). In addition, plot and discuss the ratio of the eddy viscosity to the eddy diffusivity as a function of y. Discuss the issues encountered and hence the appropriateness of the eddy diffusivity and eddy viscosity models in the core of the channel (near the centerline). (Note: In addition to averaging in homogeneous directions, geometrical symmetries can be exploited to improve statistical convergence of turbulence quantities. For example, in this problem, u is symmetric and θ is antisymmetric about the channel centerline.) 23 Hot-wireanemometersaretypicallyusedinexperimentstomeasuretheinstanta- neous flow velocity. Hot-wire anemometry works on the principle of convective cooling: a hot wire cools as a gas flows past it, and the cooling rate is dependent on the flow speed. Suppose one may write the effective measured speed as U =   ||u × e||2 + k2(u · e)2, where u is the instantaneous flow velocity vector, e is a unit vector parallel to the direction in which the length of the thin cylindrical wire points, and k2 is a small constant typically taken to be 0.04 (Moin and Spalart, 1987). (a) For an effective measurement, should the wire be placed parallel to or perpendicular to the dominant flow direction? Why? (b) Suppose that one has simultaneous access to the effective measured speeds U1 and U2 of two wires crossed at right angles (an X-wire). Could you simultaneously obtain all three velocity components at a single location with an X-wire? (c) Note that one only has access to the speeds U1 and U2, and not their signs. How does this impact the velocity data accessible to the experimenter? How might one circumvent this limitation? (d) Use appropriate assumptions on u to glean as much information on u as possible using data from an X-wire. How should the wires be oriented and/or actuated to satisfy these assumptions? References
+\par\hangindent=2em\hangafter=1 Champagne, F. H., Harris, V. G. and Corrsin, S., 1970. Experiments on nearly homogeneous turbulent shear flow. J. Fluid Mech. 41, 81–139.
+\par\hangindent=2em\hangafter=1 Choi, H. and Moin, P., 1990. On the space-time characteristics of wall-pressure fluctuations. Phys. Fluids A-Fluid 2, 1450–1460.
+\par\hangindent=2em\hangafter=1 Comte-Bellot, G. and Corrsin, S., 1971. Simple Eulerian time correlation of full- and narrow-band velocity signals in grid-generated, ‘isotropic’ turbulence. J. Fluid Mech. 48, 273–337.
+\par\hangindent=2em\hangafter=1 Hunt, J. C. R., Wray, A. A. and Moin, P., 1988. Eddies, streams, and convergence zones in turbulent flows. CTR Proceedings of the 1988 Summer Program, 193–208.
+\par\hangindent=2em\hangafter=1 Hussain, A. K. M. F. and Reynolds, W. C., 1970. The mechanics of an organized wave in turbulent shear flow. J. Fluid Mech. 41, 241–258.
+\par\hangindent=2em\hangafter=1 Hussain, A. K. M. F. and Reynolds, W. C., 1975. Measurements in fully developed turbulent channel flow. J. Fluids Engr. 97, 568–578.
+\par\hangindent=2em\hangafter=1 Hwang, W. and Eaton, J. K., 2004. Creating homogeneous and isotropic turbulence without a mean flow. Exp. Fluids 36, 444–454.
+\par\hangindent=2em\hangafter=1 Johnson, P. L., 2020. Energy transfer from large to small scales in turbulence by multiscale nonlinear strain and vorticity interactions. Phys. Rev. Lett. 124, 104501.
+\par\hangindent=2em\hangafter=1 Johnson, P. L., 2021. On the role of vorticity stretching and strain self-amplification in the turbulence energy cascade. J. Fluid Mech. 922, A3.
+\par\hangindent=2em\hangafter=1 Kim, J. and Moin, P., 1986. The structure of the vorticity field in turbulent channel flow. Part 2. Study of ensemble-averaged fields. J. Fluid Mech. 162, 339–363.
+\par\hangindent=2em\hangafter=1 Kim, J. and Moin, P., 1989. Transport of passive scalars in a turbulent channel flow. In Turbulent Shear Flows 6, ed. André, J. C., Cousteix, J., Durst, F., Launder, B. E.,
+\par\hangindent=2em\hangafter=1 Schmidt, F. W. and Whitelaw, J. H., pp. 85–96, Springer-Verlag Berlin Heidelberg.
+\par\hangindent=2em\hangafter=1 Kim, J., Moin, P. and Moser, R., 1987. Turbulence statistics in fully developed channel flow at low Reynolds number. J. Fluid Mech. 177, 133–166.
+\par\hangindent=2em\hangafter=1 Kristoffersen, R. and Andersson, H. I., 1993. Direct simulations of low-Reynolds-number turbulent flow in a rotating channel. J. Fluid Mech. 256, 163–197.
+\par\hangindent=2em\hangafter=1 Kwak, D., Reynolds, W. C. and Ferziger, J. H., 1985. Three-dimensional, time-dependent computation of turbulent flow. Stanford University Thermosciences Division Report TF-5.
+\par\hangindent=2em\hangafter=1 Lee, M. J. and Reynolds, W. C., 1985. Numerical experiments on the structure of homogeneous turbulence. Stanford University Thermosciences Division Report TF-24.
+\par\hangindent=2em\hangafter=1 Lozano-Durán, A., Hack, M. J. P. and Moin, P., 2018. Modeling boundary-layer transition in direct and large-eddy simulations using parabolized stability equations. Phys. Rev. Fluids 3, 023901.
+\par\hangindent=2em\hangafter=1 Moin, P., 2009. Revisiting Taylor’s hypothesis. J. Fluid Mech. 640, 1–4.
+\par\hangindent=2em\hangafter=1 Moin, P. and Spalart, P. R., 1987. Contributions of numerical simulation data bases to the physics, modeling, and measurement of turbulence. NASA Technical Memorandum 100022.
+\par\hangindent=2em\hangafter=1 Mydlarski, L. and Warhaft, Z., 1996. On the onset of high-Reynolds-number grid-generated wind tunnel turbulence. J. Fluid Mech. 320, 331–368.
+\par\hangindent=2em\hangafter=1 Pierce, C. D., Moin, P. and Sayadi, T., 2013. Application of vortex identification schemes to direct numerical simulation data of a transitional boundary layer. Phys. Fluids 25, 015102.
+\par\hangindent=2em\hangafter=1 Reynolds, W. C. and Hussain, A. K. M. F., 1972. The mechanics of an organized wave in turbulent shear flow. Part 3. Theoretical models and comparisons with experiments. J. Fluid Mech. 54, 263–288.
+\par\hangindent=2em\hangafter=1 Rogers, M. M. and Moin, P., 1987. The structure of the vorticity field in homogeneous turbulent flows. J. Fluid Mech. 176, 33–66.
+\par\hangindent=2em\hangafter=1 Saghafian, A., Terrapon, V. E., Ham, F. and Pitsch, H., 2011. An efficient flamelet-based combustion model for supersonic flows. AIAA Paper 2011-2267.
+\par\hangindent=2em\hangafter=1 Spalart, P. R., 1988. Direct simulation of a turbulent boundary layer up to Rθ = 1410. J. Fluid Mech. 187, 61–98.
+\par\hangindent=2em\hangafter=1 Speziale, C. G., 1985a. Galilean invariance of subgrid-scale stress models in the large-eddy simulation of turbulence. J. Fluid Mech. 156, 55–62.
+\par\hangindent=2em\hangafter=1 Speziale, C. G., 1985b. Subgrid scale stress models for the large-eddy simulation of rotating turbulent flows. Geophys. Astro. Fluid 33, 199–222.
+\par\hangindent=2em\hangafter=1 Tucker, H. J. and Reynolds, A. J., 1968. The distortion of turbulence by irrotational plane strain. J. Fluid Mech. 32, 657–673.
+\par\hangindent=2em\hangafter=1 Wu, X. and Moin, P., 2008. A direct numerical simulation study on the mean velocity characteristics in turbulent pipe flow. J. Fluid Mech. 608, 81–112.
+\par\hangindent=2em\hangafter=1 Wu, X. and Moin, P., 2009. Direct numerical simulation of turbulence in a nominally zero-pressure-gradient flat-plate boundary layer. J. Fluid Mech. 630, 5–41.
+\section*{第 3 章参考文献}
+\par\hangindent=2em\hangafter=1 Bardina, J., Ferziger, J. H. and Rogallo, R. S., 1985. Effect of rotation on isotropic turbulence: computation and modelling. J. Fluid Mech. 154, 321–336.
+\par\hangindent=2em\hangafter=1 Batchelor, G. K., 1953. The Theory of Homogeneous Turbulence. Cambridge University Press.
+\par\hangindent=2em\hangafter=1 Comte-Bellot, G. and Corrsin, S., 1966. The use of a contraction to improve the isotropy of grid-generated turbulence. J. Fluid Mech. 25, 657–682.
+\par\hangindent=2em\hangafter=1 Lee, M. J., Kim, J. and Moin, P., 1990. Structure of turbulence at high shear rate. J. Fluid Mech. 216, 561–583.
+\par\hangindent=2em\hangafter=1 Mansour, N. N., Kim, J. and Moin, P., 1988. Reynolds-stress and dissipation-rate budgets in a turbulent channel flow. J. Fluid Mech. 194, 15–44.
+\par\hangindent=2em\hangafter=1 Reynolds, W. C. and Hussain, A. K. M. F., 1972. The mechanics of an organized wave in turbulent shear flow. Part 3. Theoretical models and comparisons with experiments. J. Fluid Mech. 54, 263–288.
+\par\hangindent=2em\hangafter=1 Rogers, M. M. and Moin, P., 1987. The structure of the vorticity field in homogeneous turbulent flows. J. Fluid Mech. 176, 33–66.
+\par\hangindent=2em\hangafter=1 Rotta, J. C., 1951. Statistische Theorie nichthomogener Turbulenz. Z. Phys. 129, 547.
+\par\hangindent=2em\hangafter=1 Tavoularis, S. and Corrsin, S., 1981. Experiments in nearly homogeneous turbulent shear flow with a uniform mean temperature gradient. Part 1. J. Fluid Mech. 104, 311–347.
+\par\hangindent=2em\hangafter=1 Townsend, A., 1976. The Structure of Turbulent Shear Flow. Cambridge University Press. Van Dyke, M., 1982. An Album of Fluid Motion. The Parabolic Press.
+\section*{第 4 章参考文献}
+\par\hangindent=2em\hangafter=1 compare with your results. In particular, describe how your two-point correlations behave for separations large and small in both the streamwise and spanwise directions (e.g., the locations of the minimum Rθθ and any oscillations about zero). What large-scale structures do you see in your spectra? What small-scale structures do you see in your spectra? How does the shape and scaling behavior of the spectrum vary with distance from the wall? You may wish to compare the structures you observe with those discussed in Kim, Moin and Moser (1987), but this will entail conversions to and from wall (+) units. (d) Kim et al. (1987) plot two-point correlations and energy spectra to illustrate the adequacy of their computational domain and grid resolution. In the sheared convection data, do you think the computational box size is sufficiently large? Why or why not? What statistics of the temperature field might be more sensitive to variations in the box size? In the sheared convection data, is the grid resolution adequate? Why or why not? What statistics of the temperature field might be underresolved in these simulations? References
+\par\hangindent=2em\hangafter=1 Batchelor, G. K., 1953. The Theory of Homogeneous Turbulence. Cambridge University Press.
+\par\hangindent=2em\hangafter=1 Choi, H. and Moin, P., 1990. On the space-time characteristics of wall-pressure fluctuations. Phys. Fluids A-Fluid 2, 1450–1460.
+\par\hangindent=2em\hangafter=1 Comte-Bellot, G. and Corrsin, S., 1966. The use of a contraction to improve the isotropy of grid-generated turbulence. J. Fluid Mech. 25, 657–682.
+\par\hangindent=2em\hangafter=1 Comte-Bellot, G. and Corrsin, S., 1971. Simple Eulerian time correlation of full- and narrow-band velocity signals in grid-generated, ‘isotropic’ turbulence. J. Fluid Mech. 48, 273–337. von Kármán, T., 1948. Progress in the statistical theory of turbulence. Proc. Natl. Acad. Sci. 34, 530–539.
+\par\hangindent=2em\hangafter=1 Kim, J., Moin, P. and Moser, R., 1987. Turbulence statistics in fully developed channel flow at low Reynolds number. J. Fluid Mech. 177, 133–166.
+\par\hangindent=2em\hangafter=1 Lee, S., Lele, S. and Moin, P., 1992. Simulation of spatially evolving turbulence and the applicability of Taylor’s hypothesis in compressible flow. Phys. Fluids A 4, 1521–1530.
+\par\hangindent=2em\hangafter=1 Lozano-Durán, A., Hack, M. J. P. and Moin, P., 2018. Modeling boundary-layer transition in direct and large-eddy simulations using parabolized stability equations. Phys. Rev. Fluids 3, 023901.
+\par\hangindent=2em\hangafter=1 Moin, P., 2009. Revisiting Taylor’s hypothesis. J. Fluid Mech. 640, 1–4.
+\par\hangindent=2em\hangafter=1 Moin, P., 2010. Fundamentals of Engineering Numerical Analysis, Cambridge University Press.
+\par\hangindent=2em\hangafter=1 Press, W. H., Teukolsky, S. A., Vetterling, W. T. and Flannery, B. P., 1986. Numerical
+\par\hangindent=2em\hangafter=1 Recipes, Cambridge University Press.
+\par\hangindent=2em\hangafter=1 Taylor, G. I., 1938. The spectrum of turbulence. Proc. R. Soc. Lond. A 164, 476–490.
+\par\hangindent=2em\hangafter=1 Wu, X. and Moin, P., 2009. Direct numerical simulation of turbulence in a nominally zero-pressure-gradient flat-plate boundary layer. J. Fluid Mech. 630, 5–41.
+\section*{第 5 章参考文献}
+\par\hangindent=2em\hangafter=1 Batchelor, G. K., 1953. The Theory of Homogeneous Turbulence. Cambridge University Press.
+\par\hangindent=2em\hangafter=1 Batchelor, G. K., 1959. Small-scale variation of convected quantities like temperature in turbulent fluid. Part 1. General discussion and the case of small conductivity. J. Fluid Mech. 5, 113–133.
+\par\hangindent=2em\hangafter=1 Chapman, D. R., 1979. Computational aerodynamics development and outlook. AIAA J. 17, 1293–1313.
+\par\hangindent=2em\hangafter=1 Clark, R. A., Ferziger, J. H. and Reynolds, W. C., 1979. Evaluation of subgrid-scale models using an accurately simulated turbulent flow. J. Fluid Mech. 91, 1–16.
+\par\hangindent=2em\hangafter=1 Comte-Bellot, G. and Corrsin, S., 1971. Simple Eulerian time correlation of full- and narrow-band velocity signals in grid-generated, ‘isotropic’ turbulence. J. Fluid Mech. 48, 273–337. Di Renzo, M. and Urzay, J., 2021. Direct numerical simulation of a hypersonic transitional boundary layer at suborbital enthalpies. J. Fluid Mech. 912, A29.
+\par\hangindent=2em\hangafter=1 Heisenberg, W., 1948a. On the theory of statistical and isotropic turbulence. Proc. R. Soc. Lond. A 195, 402–406.
+\par\hangindent=2em\hangafter=1 Heisenberg, W., 1948b. Zur statistischen theorie der turbulenz. Z. Phys. 124, 628–657.
+\par\hangindent=2em\hangafter=1 Hinze, J. O., 1955. Fundamentals of the hydrodynamic mechanism of splitting in dispersion processes, AIChE J. 1, 289–295.
+\par\hangindent=2em\hangafter=1 Ishihara, T., Gotoh, T. and Kaneda, Y., 2009. Study of high-Reynolds number isotropic turbulence by direct numerical simulation. Annu. Rev. Fluid Mech. 41, 165–180.
+\par\hangindent=2em\hangafter=1 Ishihara, T., Kaneda, Y., Yokokawa, M., Itakura, K. and Uno, A., 2007. Small-scale statistics in high-resolution direct numerical simulation of turbulence: Reynolds number dependence of one-point velocity gradient statistics. J. Fluid Mech. 592, 335–366.
+\par\hangindent=2em\hangafter=1 Kolmogorov, A. N., 1941. The local structure of turbulence in incompressible viscous fluid for very large Reynolds numbers. Dokl. Akad. Nauk SSSR 30, 299–303.
+\par\hangindent=2em\hangafter=1 Laufer, J, 1950. Some recent measurements in a two-dimensional turbulent channel. J. Aeronaut. Sci. 17, 277–287.
+\par\hangindent=2em\hangafter=1 Leonard, A., 1975. Energy cascade in large-eddy simulations of turbulent fluid flows. Adv. Geophys. 18A, 237–248.
+\par\hangindent=2em\hangafter=1 Lumley, J. L., 1967. Similarity and the turbulent energy spectrum. Phys. Fluids 10, 855–858.
+\par\hangindent=2em\hangafter=1 Monin, A. S. and Yaglom, A. M., 1975. Statistical Fluid Mechanics: Mechanics of Turbulence. MIT Press.
+\par\hangindent=2em\hangafter=1 Pao, Y.-H., 1965. Structure of turbulent velocity and scalar fields at large wavenumbers. Phys. Fluids 8, 1063–1075.
+\par\hangindent=2em\hangafter=1 Pao, Y.-H., 1968. Transfer of turbulent energy and scalar quantities at large wavenumbers. Phys. Fluids 11, 1371–1372.
+\par\hangindent=2em\hangafter=1 Richardson, L. F., 1922. Weather Prediction by Numerical Process. Cambridge University Press.
+\par\hangindent=2em\hangafter=1 Rogers, M. M. and Moin, P., 1987. The structure of the vorticity field in homogeneous turbulent flows. J. Fluid Mech. 176, 33–66.
+\par\hangindent=2em\hangafter=1 Saddoughi, S. G. and Veeravalli, S. V., 1994. Local isotropy in turbulent boundary layers at high Reynolds number. J. Fluid Mech. 268, 333–372.
+\par\hangindent=2em\hangafter=1 Sekimoto, A., Dong, S. and Jiménez, J., 2016. Direct numerical simulation of statistically stationary and homogeneous shear turbulence and its relation to other shear flows. Phys. Fluids 28, 035101.
+\par\hangindent=2em\hangafter=1 Taylor, G. I., 1935. Statistical theory of turbulence. Proc. R. Soc. Lond. A 151, 421–444.
+\par\hangindent=2em\hangafter=1 Tennekes, H. and Lumley, J., 1972. A First Course in Turbulence. MIT Press (reprinted 2018). Van Dyke, M., 1982. An Album of Fluid Motion. The Parabolic Press.
+\par\hangindent=2em\hangafter=1 Wang, M., Mani, A. and Gordeyev, S., 2012. Physics and computation of aero-optics. Annu. Rev. Fluid Mech. 44, 299–321.
+\section*{第 6 章参考文献}
+\par\hangindent=2em\hangafter=1 Bell, J. H. and Mehta, R. D., 1990. Development of a two-stream mixing layer from tripped and untripped boundary layers. AIAA J. 28, 2034–2042.
+\par\hangindent=2em\hangafter=1 Bernal, L. P. and Roshko, A., 1986. Streamwise vortex structure in plane mixing layers. J. Fluid Mech. 170, 499–525.
+\par\hangindent=2em\hangafter=1 Bradshaw, P., 1966. The effect of initial conditions on the development of a free shear layer. J. Fluid Mech. 26, 225–236.
+\par\hangindent=2em\hangafter=1 Breidenthal, R., 1981. Structure in turbulent mixing layers and wakes using a chemical reaction. J. Fluid Mech. 109, 1–24.
+\par\hangindent=2em\hangafter=1 Brown, G. L. and Roshko, A., 1974. On density effects and large structure in turbulent mixing layers. J. Fluid Mech. 64, 775–816.
+\par\hangindent=2em\hangafter=1 Champagne, F. H., Pao, Y. H. and Wygnanski, I. J., 1976. On the two-dimensional mixing region. J. Fluid Mech., 74, 209–250.
+\par\hangindent=2em\hangafter=1 Cimbala, J. M. and Park, W. J., 1990. An experimental investigation of the turbulent structure in a two-dimensional momentumless wake. J. Fluid Mech. 213, 479–509.
+\par\hangindent=2em\hangafter=1 Dimotakis, P. E., 1991. Turbulent free shear layer mixing and combustion. GALCIT Report FM91-2.
+\par\hangindent=2em\hangafter=1 Dimotakis, P. E., 2005. Turbulent mixing. Annu. Rev. Fluid Mech. 37, 329–356.
+\par\hangindent=2em\hangafter=1 Heskestad, G., 1965. Hot-wire measurements in a plane turbulent jet. J. Appl. Mech. 32, 721–734.
+\par\hangindent=2em\hangafter=1 Jimenez, J., 1983. A spanwise structure in the plane shear layer. J. Fluid Mech. 132, 319–336.
+\par\hangindent=2em\hangafter=1 Koochesfahani, M. M., Dimotakis, P. E. and Broadwell, J. E., 1986. Chemically reacting turbulent shear layers. AIAA Paper 83-0475.
+\par\hangindent=2em\hangafter=1 Luzzatto-Fegiz, P. and Caulfield, C. P., 2018. Entrainment model for fully-developed wind farms: Effects of atmospheric stability and an ideal limit for wind farm performance. Phys. Rev. Fluids 3, 093802.
+\par\hangindent=2em\hangafter=1 Medici, D. and Alfredsson, P. H., 2006. Measurements on a wind turbine wake: 3D effects and bluff body vortex shedding. Wind Energy 9, 219–236.
+\par\hangindent=2em\hangafter=1 Mittal, R., Ni, R. and Seo, J., 2020. The flow physics of COVID-19. J. Fluid Mech. 894, F2.
+\par\hangindent=2em\hangafter=1 Moin, P. and Mahesh, K., 1998. Direct numerical simulation: A tool in turbulence research. Annu. Rev. Fluid Mech. 30, 539–578.
+\par\hangindent=2em\hangafter=1 Ong, L. and Wallace, J., 1996. The velocity field of the turbulent very near wake of a circular cylinder. Exp. Fluids 20, 441–453.
+\par\hangindent=2em\hangafter=1 Pope, S., 2010. Turbulent Flows. Cambridge University Press.
+\par\hangindent=2em\hangafter=1 Rogers, M. M. and Moser, R. D., 1994. Direct simulation of a self-similar turbulent mixing layer. Phys. Fluids 6, 903–923.
+\par\hangindent=2em\hangafter=1 Schutz, W. M. and Naughton, J. W., 2022. LDA measurements of a swirling axisymmetric turbulent wake. AIAA Paper 2022-1210.
+\par\hangindent=2em\hangafter=1 Stevens, R. J. A. M. and Meneveau, C., 2017. Flow structure and turbulence in wind farms. Annu. Rev. Fluid Mech. 49, 311–339.
+\par\hangindent=2em\hangafter=1 Tennekes, H. and Lumley, J., 1972. A First Course in Turbulence. MIT Press (reprinted 2018).
+\par\hangindent=2em\hangafter=1 Townsend, A. A., 1947. Measurements in the turbulent wake of a cylinder. Proc. R. Soc. London A 190, 551–561.
+\par\hangindent=2em\hangafter=1 Townsend, A. A., 1976. The Structure of Turbulent Shear Flow. Cambridge University Press.
+\par\hangindent=2em\hangafter=1 Uchida, T., 2020. Effects of inflow shear on wake characteristics of wind-turbines over flat terrain. Energies 13, 3745.
+\par\hangindent=2em\hangafter=1 Wygnanski, I., Champagne, F. and Marasli, B., 1986. On the large-scale structures in two-dimensional, small-deficit, turbulent wakes. J. Fluid Mech. 168, 31–71.
+\section*{第 7 章参考文献}
+\par\hangindent=2em\hangafter=1 How might you model the two terms on the right-hand side? (Hint: Does the mixing length l change with x2?) 8 In Exercise 4 of Chapter 5, we derived a characteristic length scale for bubble breakup in the inertial subrange of isotropic turbulence. As discussed by Levich (1962), a similar characteristic length scale may be derived for bubble (or drop) breakup in near-wall turbulence. (a) Derive an expression for this characteristic length scale DL, and show that D+ L  approximately  We −1/2 v , where Wev = ρu2 τδv/σ. (b) At what wall-normal height is DL equal to the Hinze scale DH? Derive DH by expressing ε in terms of uτ and y. Discuss where DH and DL are appropriatepredictorsforthesmallestbubble(ordrop)size,asafunctionof wall-normal height. 9 Having mostly considered the characteristic scales of wall-bounded flows in dimensionless (viscous, +) units in this chapter, let us examine what some of these scales might look like in realistic flows. Good estimates of these are important to design accurate numerical simulations. (a) Let us first consider the mean spacing between low-speed streaks on aircraft. Compare your obtained values to Examples 7.1 and 7.3. i. Take a look at the discussion in section 2.2 of the paper by Goc et al. (2021). What is a characteristic Reτ for the aircraft model they were considering? Referring back to Example 1.1 of Chapter 1, what viscous length scale does this translate to? ii. Estimate the dimensional mean spacing between low-speed streaks above an airplane wing. (b) Now, take a look at the discussion in section 6 of the paper by
+\par\hangindent=2em\hangafter=1 Choi, Moin and Kim (1993), which discusses the effects of riblets in reducing drag in turbulent flows. i. We discussed the mean streak spacing in Section 7.5, as well as the diameter of the vortices supporting them. What are the characteristic y+ and d+ of these streamwise vortices as quoted by Choi et al. (1993)? ii. The quoted value of d+ is used to support the optimal riblet spacing s+ observed in this work. What is this optimal s+, and how does it translate to dimensional terms on the wing of the plane in (a)? iii. Choi et al. (1993) suggested that turbulent drag reduction by riblets is achieved when s+ < d+. Would the same effect occur in laminar flow? (Hint: Refer to Choi et al. (1991).) References
+\par\hangindent=2em\hangafter=1 Cantwell, B., 1981. Organized motion in turbulent flow. Annu. Rev. Fluid Mech. 13, 457–515.
+\par\hangindent=2em\hangafter=1 Choi, H. and Moin, P., 2012. Grid-point requirements for large eddy simulation: Chapman’s estimates revisited. Phys. Fluids 24, 011702.
+\par\hangindent=2em\hangafter=1 Choi, H., Moin, P. and Kim, J., 1991. On the effect of riblets in fully developed laminar channel flows. Phys. Fluids A-Fluid 3, 1892–1896.
+\par\hangindent=2em\hangafter=1 Choi, H., Moin, P. and Kim, J., 1993. Direct numerical simulation of turbulent flow over riblets. J. Fluid Mech. 255, 503–539.
+\par\hangindent=2em\hangafter=1 Clauser, F. H., 1954. Turbulent boundary layers in adverse pressure gradients. J. Aeronaut. Sci. 21, 91–108.
+\par\hangindent=2em\hangafter=1 Clauser, F. H., 1956. The turbulent boundary layer. Adv. Appl. Mech. 4, 1–51.
+\par\hangindent=2em\hangafter=1 Coles, D., 1956. The law of the wake in the turbulent boundary layer. J. Fluid Mech. 1, 191–226.
+\par\hangindent=2em\hangafter=1 Goc, K. A., Lehmkuhl, O., Park, G. I., Bose, S. T. and Moin, P., 2021. Large eddy simulation of aircraft at affordable cost: A milestone in computational fluid dynamics. Flow 1, E14.
+\par\hangindent=2em\hangafter=1 Griffin, K. P., Fu, L. and Moin, P., 2021. General method for determining the boundary layer thickness in nonequilibrium flows. Phys. Rev. Fluids 6, 024608.
+\par\hangindent=2em\hangafter=1 Head, M. R. and Bandyopadhyay, P., 1981. New aspects of turbulent boundary-layer structure. J. Fluid Mech. 107, 297–338.
+\par\hangindent=2em\hangafter=1 Hoyas, S., Oberlack, M., Alcántara-Ávila, F., Kraheberger, S. V. and Laux, J., 2022. Wall turbulence at high friction Reynolds numbers. Phys. Rev. Fluids 7, 014602. von Kármán, T., 1930. Mechanische Ahnlichten und Turbulenz. Proceedings of the Third International Congress on Applied Mechanics, 85–93. von Kármán, T., 1934. Turbulence and skin friction. J. Aeronaut. Sci. 1, 1–20.
+\par\hangindent=2em\hangafter=1 Kim, H. T., Kline, S. J. and Reynolds, W. C., 1971. The production of turbulence near a smooth wall in a turbulent boundary layer. J. Fluid Mech. 71, 133–160.
+\par\hangindent=2em\hangafter=1 Kim, J., Moin, P. and Moser, R., 1987. Turbulence statistics in fully developed channel flow at low Reynolds number. J. Fluid Mech. 177, 133–166.
+\par\hangindent=2em\hangafter=1 Klebanoff, P. S., 1954. Characteristics of turbulence in a boundary layer with zero pressure gradient. NACA Technical Note 3178.
+\par\hangindent=2em\hangafter=1 Kline, S. J., Reynolds, W. C., Schraub, F. A. and Runstadler, P. W., 1967. The structure of turbulent boundary layers. J. Fluid Mech. 30, 741–773.
+\par\hangindent=2em\hangafter=1 Laufer, J., 1954. The structure of turbulence in fully developed pipe flow. NACA Technical Note 2954.
+\par\hangindent=2em\hangafter=1 Lee, M. and Moser, R. D., 2015. Direct numerical simulation of turbulent channel flow up to Reτ = 5200. J. Fluid Mech. 774, 395–415.
+\par\hangindent=2em\hangafter=1 Levich, V. G., 1962. Physicochemical Hydrodynamics. Prentice-Hall.
+\par\hangindent=2em\hangafter=1 Luzzatto-Fegiz, P. and Caulfield, C. P., 2018. Entrainment model for fully-developed wind farms: Effects of atmospheric stability and an ideal limit for wind farm performance. Phys. Rev. Fluids 3, 093802.
+\par\hangindent=2em\hangafter=1 Mansour, N. N., Kim, J. and Moin, P., 1988. Reynolds-stress and dissipation-rate budgets in a turbulent channel flow. J. Fluid Mech. 194, 15–44.
+\par\hangindent=2em\hangafter=1 Marusic, I., McKeon, B. J., Monkewitz, P. A., Nagib, H. M., Smits, A. J. and Sreenivasan, K. R., 2010. Wall-bounded turbulent flows at high Reynolds numbers: Recent advances and key issues. Phys. Fluids 22, 065103.
+\par\hangindent=2em\hangafter=1 Millikan, C., 1938. A critical discussion of turbulent flows in channels and circular tubes. Proceedings of the Fifth International Congress on Applied Mechanics, Cambridge, MA, 386–392.
+\par\hangindent=2em\hangafter=1 Moin, P. and Kim, J., 1985. The structure of the vorticity field in turbulent channel flow. Part 1. Analysis of instantaneous fields and statistical correlations. J. Fluid Mech. 155, 441–464.
+\par\hangindent=2em\hangafter=1 Morrison, J. F., McKeon, B. J., Jiang, W. and Smits, A. J., 2004. Scaling of the streamwise velocity component in turbulent pipe flow. J. Fluid Mech. 508, 99–131.
+\par\hangindent=2em\hangafter=1 Nagib, H. M. and Chauhan, K. A., 2008. Variations of von Kármán coefficient in canonical flows. Phys. Fluids 20, 101518.
+\par\hangindent=2em\hangafter=1 Nagib, H. and Hites, M., 1995. High Reynolds number boundary-layer measurements in the NDF. AIAA Paper 95-0786.
+\par\hangindent=2em\hangafter=1 Narayanan, B. and Marvin, J., 1978. On the period of the coherent structure in boundary layers at large Reynolds numbers. In Lehigh Workshop on Coherent Structure in Turbulent Boundary Layers, ed. C. R. Smith and D. E. Abbot, 380–388.
+\par\hangindent=2em\hangafter=1 Prandtl, L., Wieselsberger, C. and Betz, A., 1925. Ergebnisse der aerodynamischen Versuchsanstalt zu Göttingen.
+\par\hangindent=2em\hangafter=1 Rao, K. N., Narasimha, R. and Narayanan, M. A. B., 1971. Bursting in a turbulent boundary layer. J. Fluid Mech. 48, 339–352.
+\par\hangindent=2em\hangafter=1 Robinson, S. K., 1991. Coherent motions in the turbulent boundary layer. Annu. Rev. Fluid Mech. 23, 601–639.
+\par\hangindent=2em\hangafter=1 Rogers, M. M. and Moin, P., 1987. The structure of the vorticity field in homogeneous turbulent flows. J. Fluid Mech. 176, 33–66.
+\par\hangindent=2em\hangafter=1 Samie, M., Marusic, I., Hutchins, N., Fu, M. K., Fan, Y., Hultmark, M. and Smits, A. J., 2018. Fully resolved measurements of turbulent boundary layer flows up to Reτ = 20000. J. Fluid Mech. 851, 391–415.
+\par\hangindent=2em\hangafter=1 Schlichting, H. and Gersten, K., 2017. Boundary-Layer Theory. Springer.
+\par\hangindent=2em\hangafter=1 Theodorsen, T., 1955. The structure of turbulence. In 50 Jahre Grenzschichtforsung, ed. H. Görtier and W. Tollmein, p. 55. Van Dyke, M., 1982. An Album of Fluid Motion. The Parabolic Press.
+\par\hangindent=2em\hangafter=1 Yamamoto, Y. and Tsuji, Y., 2018. Numerical evidence of logarithmic regions in channel flow at Reτ = 8000. Phys. Rev. Fluids 3, 012602.
+\par\hangindent=2em\hangafter=1 Zhou, J., Adrian, R. J., Balachandar, S. and Kendall, T. M., 1999. Mechanisms for generating coherent packets of hairpin vortices in channel flow. J. Fluid Mech. 387, 353–396.
+\section*{第 8 章参考文献}
+\par\hangindent=2em\hangafter=1 Use this and appropriate assumption(s), which you should list and discuss, to show that the Smagorinsky model may be recovered by taking Cs = C 3/2 k . (c) Show, using the dynamic procedure, that the Kolmogorov eddy viscosity yields νT = − 2(α4/3 − 1) Lij ˆ Sij ˆ Sij ˆ Sij , (8.39) where α = ˆ / . Note that there are fewer filtering operations in this formulation as compared to the dynamic procedure applied to the Smagorinsky model. For example,   |S|Sij does not appear here. References
+\par\hangindent=2em\hangafter=1 Agrawal, R., Whitmore, M. P., Griffin, K. P., Moin, P. and Bose, S. T., 2022. Non-Boussinesq subgrid-scale model with dynamic tensorial coefficients. Phys. Rev. Fluids 7, 074602.
+\par\hangindent=2em\hangafter=1 Bernard, P. S. and Wallace, J. M., 2002. Turbulent Flow: Analysis, Measurement, and Prediction. John Wiley \& Sons.
+\par\hangindent=2em\hangafter=1 Bose, S. T. and Park, G. I., 2018. Wall-modeled large-eddy simulation for complex turbulent flows. Annu. Rev. Fluid Mech. 50, 535–561.
+\par\hangindent=2em\hangafter=1 Carati, D., Jansen, K. and Lund, T., 1995. A family of dynamic models for large-eddy simulation. CTR Annual Research Briefs, 35–40.
+\par\hangindent=2em\hangafter=1 Choi, H. and Moin, P., 2012. Grid-point requirements for large eddy simulation: Chapman’s estimates revisited. Phys. Fluids 24, 011702.
+\par\hangindent=2em\hangafter=1 Comte-Bellot, G. and Corrsin, S., 1971. Simple Eulerian time correlation of full- and narrow-band velocity signals in grid-generated, ‘isotropic’ turbulence. J. Fluid Mech. 48, 273–337.
+\par\hangindent=2em\hangafter=1 Deardorff, J. W., 1970. A numerical study of three-dimensional turbulent channel flow at large Reynolds numbers. J. Fluid Mech. 41, 453–480. van Driest, E. R., 1956. On turbulent flow near a wall. J. Aeronaut. Sci. 23, 1007–1011.
+\par\hangindent=2em\hangafter=1 Durbin, P. A. and Pettersson Reif, B. A., 2001. Statistical Theory and Modeling for Turbulent Flows. John Wiley \& Sons.
+\par\hangindent=2em\hangafter=1 Germano, M., Piomelli, U., Moin, P. and Cabot, W. H., 1991. A dynamic subgrid-scale eddy viscosity model. Phys. Fluids A: Fluid 3, 1760–1765.
+\par\hangindent=2em\hangafter=1 Ghosal, S., Lund, T. S., Moin, P. and Akselvoll, K., 1995. A dynamic localization model for large-eddy simulation of turbulent flows. J. Fluid Mech. 228, 229–255.
+\par\hangindent=2em\hangafter=1 Goc, K., Lehmkuhl, O., Park, G. I., Bose, S. T. and Moin, P., 2021. Large eddy simulation of aircraft at affordable cost: a milestone in computational fluid dynamics. Flow 1, E14. Hanjalić, K. and Launder, B., 2011. Modelling Turbulence in Engineering and the Environment: Second-Moment Routes to Closure. Cambridge University Press.
+\par\hangindent=2em\hangafter=1 Kristoffersen, R. and Andersson, H. I., 1993. Direct simulations of low-Reynolds-number turbulent flow in a rotating channel. J. Fluid Mech. 256, 163–197.
+\par\hangindent=2em\hangafter=1 Kwak, D., Reynolds, W. C. and Ferziger, J. H., 1975. Three-dimensional, time-dependent computation of turbulent flow. Stanford University Thermosciences Division Report TF-5.
+\par\hangindent=2em\hangafter=1 Launder, B. E. and Sharma, B. I., 1974. Application of the energy-dissipation model of turbulence to the calculation of flow near a spinning disc. Lett. Heat Mass Trans. 1, 131–137.
+\par\hangindent=2em\hangafter=1 Launder, B. E., Reece, G. J. and Rodi, W., 1975. Progress in the development of a Reynolds-stress turbulence closure. J. Fluid Mech. 68, 537–566.
+\par\hangindent=2em\hangafter=1 Leonard, A., 1975. Energy cascade in large-eddy simulations of turbulent fluid flows. Adv. Geophys. 18, 237–248.
+\par\hangindent=2em\hangafter=1 Lilly, D. K., 1966. On the application of the eddy viscosity concept in the inertial sub-range of turbulence. NCAR Manuscript No. 123, Boulder, CO.
+\par\hangindent=2em\hangafter=1 Lilly, D. K., 1988. The length scale for sub-grid-scale parameterization with anisotropic resolution. CTR Annual Research Briefs, 3–9.
+\par\hangindent=2em\hangafter=1 Lilly, D. K., 1992. A proposed modification of the Germano subgrid-scale closure method. Phys. Fluids A: Fluid 4, 633–635.
+\par\hangindent=2em\hangafter=1 Mansour, N. N., Moin, P., Reynolds, W. C. and Ferziger, J. H., 1979. Improved methods for large eddy simulations of turbulence. In Turbulent Shear Flows I, ed. F. Durst, B. E.
+\par\hangindent=2em\hangafter=1 Launder, F. W. Schmidt and J. H. Whitelaw, 386–401.
+\par\hangindent=2em\hangafter=1 Marsden, A. L., Vasilyev, O. V. and Moin, P., 2002. Construction of commutative filters for LES on unstructured meshes. J. Comput. Phys. 175, 584–603.
+\par\hangindent=2em\hangafter=1 McMillan, O. J., Ferziger, J. H. and Rogallo, R. S., 1980. Tests of new subgrid-scale models in strained turbulence. AIAA Paper 80-1339.
+\par\hangindent=2em\hangafter=1 Meneveau, C. and Katz, J., 2000. Scale-invariance and turbulence models for large-eddy simulation. Annu. Rev. Fluid Mech. 32, 1–32.
+\par\hangindent=2em\hangafter=1 Moin, P. and Mahesh, K., 1998. Direct numerical simulation: a tool in turbulence research. Annu. Rev. Fluid Mech. 30, 539–578.
+\par\hangindent=2em\hangafter=1 Moin, P., Squires, K., Cabot, W. and Lee, S., 1991. A dynamic subgrid-scale model for compressible turbulence and scalar transport. Phys. Fluids A: Fluid 3, 2746–2757.
+\par\hangindent=2em\hangafter=1 Nicoud, F., Toda, H. B., Cabrit, O., Bose, S. and Lee, J., 2011. Using singular values to build a subgrid-scale model for large eddy simulations. Phys. Fluids 23, 085106.
+\par\hangindent=2em\hangafter=1 Nikuradse, J., 1933. Strömungsgesetze in rauhen Rohren. VDI-Forschungsheft 361.
+\par\hangindent=2em\hangafter=1 Nikuradse, J., 1950. Laws of flow in rough pipes. NACA TM 1292.
+\par\hangindent=2em\hangafter=1 Park, G. I. and Moin, P., 2016. Numerical aspects and implementation of a two-layer zonal wall model for LES of compressible turbulent flows on unstructured meshes. J. Comput. Phys. 305, 589–603.
+\par\hangindent=2em\hangafter=1 Piomelli, U. and Balaras, E., 2002. Wall-layer models for large-eddy simulations. Annu. Rev. Fluid Mech. 34, 349–374.
+\par\hangindent=2em\hangafter=1 Pope, S., 1978. An explanation of the turbulent round-jet/plane-jet anomaly. AIAA J. 6, 279–281.
+\par\hangindent=2em\hangafter=1 Prandtl, L., Wieselsberger, C. and Betz, A., 1925. Ergebnisse der aerodynamischen Versuchsanstalt zu Göttingen.
+\par\hangindent=2em\hangafter=1 Rogallo, R. S. and Moin, P., 1984. Numerical simulation of turbulent flows. Annu. Rev. Fluid Mech. 16, 99–137.
+\par\hangindent=2em\hangafter=1 Rozema, W., Bae, H. J., Moin, P. and Verstappen, R., 2015. Minimum-dissipation models for large-eddy simulation. Phys. Fluids 27, 085107.
+\par\hangindent=2em\hangafter=1 Sagaut, P., 2001. Large Eddy Simulation for Incompressible Flows. Springer Berlin.
+\par\hangindent=2em\hangafter=1 Smagorinsky, J., 1963. General circulation experiments with the primitive equations: I. The basic experiment. Mon. Weather Rev. 91, 99–164.
+\par\hangindent=2em\hangafter=1 Vasilyev, O. V., Lund, T. S. and Moin, P., 1998. A general class of commutative filters for LES in complex geometries. J. Comput. Phys. 146, 82–104.
+\par\hangindent=2em\hangafter=1 Vreman, A. W., 2004. An eddy-viscosity subgrid-scale model for turbulent shear flow: Algebraic theory and applications. Phys. Fluids 16, 3670–3681.
+\par\hangindent=2em\hangafter=1 Wilcox, D. C., 2006. Turbulence Modeling for CFD. DCW Industries.
+\par\hangindent=2em\hangafter=1 Wong, V. C. and Lilly, D. K., 1994. A comparison of two dynamic subgrid closure methods for turbulent thermal convection. Phys. Fluids 6, 1016–1023.
+\par\hangindent=2em\hangafter=1 Yang, X. I. A. and Griffin, K. P., 2021. Grid-point and time-step requirements for direct numerical simulation and large-eddy simulation. Phys. Fluids 33, 015108.
+\section*{第 9 章参考文献}
+\par\hangindent=2em\hangafter=1 Show that the operators Gu(pn) = pn − pn−1 h and Gd(pn) = pn+1 − pn h for the divergence and gradient (in either order) yield L(p) when applied to p in succession. (h) If we use central differences, δ/δx, for the derivatives in the divergence and gradient operators instead of Gu and Gd, compute the corresponding Laplacian δ2p/δx2 and observe that it depends on pn±2 and pn. In other words, the even and odd mesh values of p are decoupled, which results in the checkerboarding problem when enforcing continuity in the Navier– Stokes equations. This problem is avoided in the discrete operators selected in the previous part, which correspond to a staggered mesh formulation. 5 As in Exercise 8 of Chapter 2, contract (2.59) with ui, and show that in the absence of viscosity, this form of the governing equations satisfies global kinetic energy conservation. References
+\par\hangindent=2em\hangafter=1 Aihara, A. and Kawai, S., 2023. Effects of spanwise domain size on LES-predicted aerodynamics of stalled airfoil. AIAA J. 61, 1440–1446.
+\par\hangindent=2em\hangafter=1 Canuto, C., Hussaini, M. Y. Quarteroni, A. and Zang, T. A., 2017. Spectral Methods: Evolution to Complex Geometries and Applications to Fluid Dynamics. Springer-Verlag.
+\par\hangindent=2em\hangafter=1 Chyu, C. K. and Rockwell, D., 1996. Near-wake structure of an oscillating cylinder: Effect of controlled shear-layer vortices. J. Fluid Mech. 322, 21–49.
+\par\hangindent=2em\hangafter=1 Harlow, F. H. and Welch, J. E., 1965. Numerical calculation of time-dependent viscous incompressible flow of fluid with free surface. Phys. Fluids 8, 2182–2189.
+\par\hangindent=2em\hangafter=1 Kim, J. and Moin, P., 1985. Application of a fractional-step method to incompressible Navier-Stokes equations. J. Comp. Phys. 59, 308–323.
+\par\hangindent=2em\hangafter=1 Kim, J., Moin, P. and Moser, R., 1987. Turbulence statistics in fully developed channel flow at low Reynolds number. J. Fluid Mech. 177, 133–166.
+\par\hangindent=2em\hangafter=1 Kleiser, L., and Schumann, U., 1980. Treatment of incompressibility and boundary conditions in 3-D numerical spectral simulations of plane channel flows. In Proceedings of the Third GAMM—Conference on Numerical Methods in Fluid Mechanics, 165–173.
+\par\hangindent=2em\hangafter=1 Kravchenko, A. G. and Moin, P., 1997. On the effect of numerical errors in large eddy simulations of turbulent flows. J. Comput. Phys. 131, 310–322.
+\par\hangindent=2em\hangafter=1 Kravchenko, A. G. and Moin, P., 2000. Numerical studies of flow over a circular cylinder at ReD = 3900. J. Comput. Phys. 12, 403–417.
+\par\hangindent=2em\hangafter=1 Lilly, D. K., 1965. On the computational stability of numerical solutions of time-dependent non-linear geophysical fluid dynamics problems. Mon. Weather Rev. 93, 11–26.
+\par\hangindent=2em\hangafter=1 Lozano-Durán, A., Holzner, M. and Jiménez, J., 2015. Numerically accurate computation of the conditional trajectories of the topological invariants in turbulent flows. J. Comput. Phys. 295, 805–814.
+\par\hangindent=2em\hangafter=1 Mansour, N. N., Moin, P., Reynolds, W. C. and Ferziger, J. H., 1979. Improved methods for large eddy simulations of turbulence. In Turbulent Shear Flows I, ed. F. Durst, B. E.
+\par\hangindent=2em\hangafter=1 Launder, F. W. Schmidt and J. H. Whitelaw, 386–401.
+\par\hangindent=2em\hangafter=1 Mittal, R. and Moin, P., 1997. Suitability of upwind-based finite difference schemes for large-eddy simulation of turbulent flows. AIAA J. 35, 1415–1417.
+\par\hangindent=2em\hangafter=1 Moin, P., 2010. Fundamentals of Engineering Numerical Analysis, Cambridge University Press.
+\par\hangindent=2em\hangafter=1 Moin, P. and Verzicco, R., 2016. On the suitability of second-order accurate discretizations for turbulent flow simulations. Eur. J. Mech. B/Fluids 55, 242–245.
+\par\hangindent=2em\hangafter=1 Morinishi, Y., Lund, T. S., Vasilyev, O. V. and Moin, P., 1998. Fully conservative higher order finite difference schemes for incompressible flow. J. Comput. Phys. 143, 90–124.
+\par\hangindent=2em\hangafter=1 Moser, R., 1984. Direct numerical simulation of curved turbulent channel flow. PhD dissertation, Stanford University.
+\par\hangindent=2em\hangafter=1 Ong, L. and Wallace, J., 1996. The velocity field of the turbulent very near wake of a circular cylinder. Exp. Fluids 20, 441–453.
+\par\hangindent=2em\hangafter=1 Orlandi, P., 1989. A numerical method for direct simulation of turbulence in complex geometries. CTR Annual Research Briefs, 215–230.
+\par\hangindent=2em\hangafter=1 Orlandi, P., 2000. Fluid Flow Phenomena: A Numerical Toolkit. Kluwer Academic Publishers.
+\par\hangindent=2em\hangafter=1 Pauley, L. L., Moin, P. and Reynolds, W. C., 1990. The structure of two-dimensional separation. J. Fluid Mech. 220, 397–411.
+\par\hangindent=2em\hangafter=1 Roache, P. J., 1972. Computational Fluid Dynamics. Hermosa Publishers.
+\par\hangindent=2em\hangafter=1 Wu, X., 2017. Inflow turbulence generation methods. Annu. Rev. Fluid Mech. 49, 23–49.
+\par\hangindent=2em\hangafter=1 Wu, X. and Moin, P., 2009. Direct numerical simulation of turbulence in a nominally zero-pressure-gradient flat-plate boundary layer. J. Fluid Mech. 630, 5–41.
+\par\hangindent=2em\hangafter=1 Zang, T. A., 1991. On the rotation and skew-symmetric forms for incompressible flow simulations. Appl. Numer. Math. 7, 27–40.
+\endgroup
+
+\chapter*{译后检查说明}
+\addcontentsline{toc}{chapter}{译后检查说明}
+译本中的张量下标均采用 Einstein 求和约定；角波数以 $\kappa$ 表示，避免与湍动能 $k$ 混淆；平均量、脉动量和滤波量分别用大写/尖括号、撇号和上横线区分。所有守恒式均按单位质量形式书写，Reynolds 应力 $R_{ij}=\avg{u_i'u_j'}$ 因而具有速度平方量纲；若采用应力量纲，应整体乘以 $-\rho$。
+\end{document}
